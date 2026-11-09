@@ -43,7 +43,13 @@ object StateBus {
     var overlayError: String = ""
 }
 
-/** @brief 无障碍服务上报的当前前台应用 */
+/**
+ * @brief 无障碍服务上报的当前前台应用
+ *
+ * atHome 用于「明确停留在桌面 / 非应用界面」的状态：该状态不设过期时间，
+ * 会一直保持到下一个应用窗口事件，避免长时间停留桌面后被回退逻辑误判为
+ * 「仍在之前的应用里」而继续累计时长。
+ */
 object ForegroundTracker {
     @Volatile
     var currentPackage: String = ""
@@ -54,9 +60,22 @@ object ForegroundTracker {
     @Volatile
     var lastUpdateMs: Long = 0L
 
+    @Volatile
+    var atHome: Boolean = false
+
+    /** @brief 进入一个可计时应用（清除桌面状态） */
     fun update(pkg: String, cls: String) {
         currentPackage = pkg
         currentClass = cls
         lastUpdateMs = System.currentTimeMillis()
+        atHome = false
+    }
+
+    /** @brief 明确回到桌面 / 非应用界面；homePkg 仅用于状态栏展示，可为空 */
+    fun markHome(homePkg: String) {
+        currentPackage = homePkg
+        currentClass = ""
+        lastUpdateMs = System.currentTimeMillis()
+        atHome = true
     }
 }

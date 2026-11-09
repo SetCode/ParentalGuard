@@ -63,6 +63,7 @@ class MainActivity : Activity() {
     private lateinit var rulesContainer: LinearLayout
     private lateinit var btnRefreshPerm: Button
     private lateinit var btnChangePin: Button
+    private lateinit var btnShare: Button
     private lateinit var btnTestVoice: Button
     private lateinit var btnTtsSettings: Button
     private lateinit var tvVoiceEngine: TextView
@@ -151,6 +152,7 @@ class MainActivity : Activity() {
         rulesContainer = findViewById(R.id.rulesContainer)
         btnRefreshPerm = findViewById(R.id.btnRefreshPerm)
         btnChangePin = findViewById(R.id.btnChangePin)
+        btnShare = findViewById(R.id.btnShare)
         btnTestVoice = findViewById(R.id.btnTestVoice)
         btnTtsSettings = findViewById(R.id.btnTtsSettings)
         tvVoiceEngine = findViewById(R.id.tvVoiceEngine)
@@ -185,6 +187,7 @@ class MainActivity : Activity() {
             Toast.makeText(this, "已重新检测权限", Toast.LENGTH_SHORT).show()
         }
         btnChangePin.setOnClickListener { showPinSettingDialog() }
+        btnShare.setOnClickListener { startActivity(Intent(this, ShareActivity::class.java)) }
         btnTestVoice.setOnClickListener {
             cfg = ConfigRepository.get(this)
             if (!cfg.soundEnabled && !cfg.visualPromptEnabled) {

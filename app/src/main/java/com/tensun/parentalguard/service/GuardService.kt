@@ -29,6 +29,7 @@ import com.tensun.parentalguard.data.ConfigRepository
 import com.tensun.parentalguard.data.UsageRepository
 import com.tensun.parentalguard.model.RulesConfig
 import com.tensun.parentalguard.model.UsageSnapshot
+import com.tensun.parentalguard.share.ShareSync
 import com.tensun.parentalguard.ui.MainActivity
 
 /**
@@ -46,6 +47,24 @@ class GuardService : Service() {
         private const val NOTIF_ID = 1001
         private const val TICK_MS = 1000L
         private const val TAG = "GuardService"
+
+        @Volatile
+        private var live: GuardService? = null
+
+        /**
+         * @brief 窗口切换事件触发一次即时心跳：退出应用时立刻结算暂停，
+         * 重新进入时立刻开启新片段，避免最多 1 秒的计时漂移
+         */
+        fun requestTick() {
+            val s = live ?: return
+            s.handler.post {
+                try {
+                    s.tick()
+                } catch (e: Exception) {
+                    Log.w(TAG, "即时刷新异常: ${e.message}")
+                }
+            }
+        }
     }
 
     private val handler = Handler(Looper.getMainLooper())
@@ -98,6 +117,7 @@ class GuardService : Service() {
         }
 
         UsageRepository.onBoot(this, System.currentTimeMillis())
+        live = this
         StateBus.serviceRunning = true
         startTicking()
     }
@@ -121,6 +141,7 @@ class GuardService : Service() {
         handler.removeCallbacks(tickRunnable)
         try { unregisterReceiver(screenReceiver) } catch (e: Exception) { /* 已注销 */ }
         if (::overlay.isInitialized) overlay.hide()
+        live = null
         StateBus.serviceRunning = false
         super.onDestroy()
     }
@@ -151,9 +172,15 @@ class GuardService : Service() {
         var eval = RuleEngine.evaluate(this, cfg, snap, fg, now)
 
         // 锁定期间不累计使用时长；屏幕熄灭时同样暂停。
-        // 前台应用暂时识别不到时仍按屏幕使用计入设备总时长，保证每日/连续规则不失效。
-        val accountingPkg = if (fg.isEmpty()) "__unknown_foreground__" else fg
-        UsageRepository.sync(this, now, accountingPkg, screenOn, !eval.locked)
+        // 计时范围严格按当前前台判定：桌面 / 系统界面 / 后台 / 未知前台由 sync 统一暂停，
+        // 不再用哨兵包名把非应用状态继续算成设备使用。
+        UsageRepository.sync(this, now, fg, screenOn, !eval.locked)
+        // 把「本设备」的计时分量写入共享数据集，供局域网内其他设备合并
+        ShareSync.onLocalTimingChanged(
+            now,
+            screenOn && !eval.locked && UsageAccess.isCountableForeground(this, fg),
+            fg
+        )
         snap = UsageRepository.snapshot(this, now)
         eval = RuleEngine.evaluate(this, cfg, snap, fg, now)
 
@@ -290,12 +317,22 @@ class GuardService : Service() {
         )
     }
 
+    /**
+     * @brief 解析当前前台状态，供计时与规则判定共用
+     *
+     * 明确停留在桌面时直接返回桌面包名（不设过期），由 sync 判为非计时状态；
+     * 无障碍信号过期后用 UsageEvents 前后台事件序列判断「已离开 / 已进入 / 无新事件」；
+     * 只有「无任何新事件且上次是普通应用」才保持原状态继续计时，避免静止使用丢时长。
+     */
     private fun currentForeground(now: Long): String {
+        if (ForegroundTracker.atHome) return ForegroundTracker.currentPackage
         val tracked = ForegroundTracker.currentPackage
-        val fresh = tracked.isNotEmpty() && now - ForegroundTracker.lastUpdateMs < 10_000L
-        if (fresh && StateBus.accessibilityConnected) return tracked
-        val fallback = UsageAccess.recentForeground(this, now)
-        return if (fallback.isNotEmpty()) fallback else tracked
+        val fresh = tracked.isNotEmpty() && StateBus.accessibilityConnected &&
+                now - ForegroundTracker.lastUpdateMs < 10_000L
+        if (fresh) return tracked
+        val state = UsageAccess.recentForegroundState(this, now)
+        if (state.known) return state.pkg
+        return if (tracked.isNotEmpty() && !UsageAccess.isSystemSurface(this, tracked)) tracked else ""
     }
 
     private fun goHomeFallback() {
