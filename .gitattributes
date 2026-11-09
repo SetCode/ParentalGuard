@@ -1,5 +1,5 @@
 # 统一换行，避免 gradlew 在跨平台 checkout 后带 CRLF 无法执行
-* text=auto
+* text=auto eol=lf
 gradlew text eol=lf
 *.bat text eol=crlf
 *.kt text eol=lf
