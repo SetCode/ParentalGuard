@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="单次连续使用上限（分钟）"
+        android:textColor="@color/text_sub"
+        android:textSize="13sp" />
+
+    <EditText
+        android:id="@+id/editContinuous"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:inputType="number"
+        android:maxLength="4"
+        android:textSize="20sp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:text="到点后强制休息时长（分钟，0 表示不锁定只清零）"
+        android:textColor="@color/text_sub"
+        android:textSize="13sp" />
+
+    <EditText
+        android:id="@+id/editRest"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:inputType="number"
+        android:maxLength="4"
+        android:textSize="20sp" />
+</LinearLayout>

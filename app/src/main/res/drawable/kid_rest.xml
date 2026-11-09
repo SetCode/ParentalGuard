@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 睡觉 / 休息符号：白色月牙 + 星星 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M15.2,3 A8.6,8.6 0 1,0 20.9,17 A7.2,7.2 0 1,1 15.2,3 Z" />
+
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M18,3.6 L18.65,5 L20.05,5.65 L18.65,6.3 L18,7.7 L17.35,6.3 L15.95,5.65 L17.35,5 Z" />
+
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M20,9 L20.45,9.95 L21.4,10.4 L20.45,10.85 L20,11.8 L19.55,10.85 L18.6,10.4 L19.55,9.95 Z" />
+</vector>

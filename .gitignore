@@ -1,0 +1,15 @@
+# IDE / 本机配置
+*.iml
+.idea/
+local.properties
+
+# Gradle / 构建产物
+.gradle/
+build/
+app/build/
+captures/
+.externalNativeBuild
+
+# Python 语音资源生成脚本缓存
+__pycache__/
+*.pyc

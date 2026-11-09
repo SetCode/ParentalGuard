@@ -1,0 +1,74 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+android {
+    namespace 'com.tensun.parentalguard'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.tensun.parentalguard'
+        minSdk 26
+        // 保持 33：规避 Android 14 对前台服务类型的额外声明要求，
+        // 同时仍然可以安装并运行在 Android 14/15/16 设备上。
+        targetSdk 33
+        versionCode 1
+        versionName '1.0.0'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
+    // 发布签名：目录下同时存在 release.jks 与 keystore.properties 时自动启用。
+    // 这是随工程交付的演示密钥，正式发布请替换为自己的密钥并妥善保管。
+    def ksPropsFile = rootProject.file('keystore.properties')
+    def ksFile = rootProject.file('release.jks')
+    def hasReleaseKey = ksPropsFile.exists() && ksFile.exists()
+    if (hasReleaseKey) {
+        def ksProps = new Properties()
+        ksProps.load(new FileInputStream(ksPropsFile))
+        signingConfigs {
+            release {
+                storeFile file(ksProps.getProperty('storeFile'))
+                storePassword ksProps.getProperty('storePassword')
+                keyAlias ksProps.getProperty('keyAlias')
+                keyPassword ksProps.getProperty('keyPassword')
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            minifyEnabled false
+            debuggable true
+        }
+        release {
+            minifyEnabled false
+            if (hasReleaseKey) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+
+    packagingOptions {
+        resources {
+            excludes += ['META-INF/*.kotlin_module']
+        }
+    }
+}
+
+// 全部使用 Android Framework API + Kotlin 标准库，无 AndroidX / 无第三方依赖
+dependencies {
+}

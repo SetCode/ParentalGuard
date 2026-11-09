@@ -1,0 +1,16 @@
+# 统一换行，避免 gradlew 在跨平台 checkout 后带 CRLF 无法执行
+* text=auto
+gradlew text eol=lf
+*.bat text eol=crlf
+*.kt text eol=lf
+*.xml text eol=lf
+*.gradle text eol=lf
+*.properties text eol=lf
+*.md text eol=lf
+
+# 二进制资源不做换行转换
+*.mp3 binary
+*.apk binary
+*.jks binary
+*.jar binary
+*.png binary
