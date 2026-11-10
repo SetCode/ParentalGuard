@@ -17,6 +17,15 @@ object Formatter {
         }
     }
 
+    /** @brief 完整时分秒：00 时 00 分 00 秒，始终保留时 / 分 / 秒三段 */
+    fun hmsFull(ms0: Long): String {
+        val sec = ms0.coerceAtLeast(0L) / 1000L
+        val h = sec / 3600L
+        val m = (sec % 3600L) / 60L
+        val s = sec % 60L
+        return String.format(Locale.CHINA, "%02d 时 %02d 分 %02d 秒", h, m, s)
+    }
+
     /** @brief 中文可读时长（向上取整到分钟） */
     fun human(ms0: Long): String {
         val min = (ms0.coerceAtLeast(0L) + 59_999L) / 60_000L

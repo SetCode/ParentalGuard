@@ -232,7 +232,25 @@ def run_share_cases():
     check("C6 跨天清零且不串入旧数据", t.total() == 90_000, "total=%s" % t.total())
 
 
+def hms_full(ms):
+    """复刻 Kotlin Formatter.hmsFull()：始终保留时 / 分 / 秒三段，向下取整到整秒"""
+    sec = max(0, ms) // 1000
+    return "%02d 时 %02d 分 %02d 秒" % (sec // 3600, (sec % 3600) // 60, sec % 60)
+
+
+def run_display_cases():
+    print("=== 三、秒级展示格式：时 / 分 / 秒 ===")
+    check("F1 不足 1 秒不进位", hms_full(999) == "00 时 00 分 00 秒", hms_full(999))
+    check("F2 整秒与跨分钟保留三段",
+          hms_full(59_000) == "00 时 00 分 59 秒" and hms_full(60_000) == "00 时 01 分 00 秒")
+    check("F3 跨小时且不省略小时", hms_full(3_661_000) == "01 时 01 分 01 秒", hms_full(3_661_000))
+    check("F4 相邻两秒可见变化", hms_full(45_000) != hms_full(46_000),
+          "%s -> %s" % (hms_full(45_000), hms_full(46_000)))
+    check("F5 负数按 0 处理", hms_full(-5_000) == "00 时 00 分 00 秒")
+
+
 if __name__ == "__main__":
     run_timing_cases()
     run_share_cases()
+    run_display_cases()
     print("ALL CHECKS PASSED")

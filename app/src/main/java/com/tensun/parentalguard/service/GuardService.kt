@@ -70,7 +70,7 @@ class GuardService : Service() {
     private val handler = Handler(Looper.getMainLooper())
     private var ticking = false
     private lateinit var overlay: LockOverlay
-    private var lastNotificationMs = 0L
+    private var lastNotificationKey = ""
     private var lastLocked = false
     private var lastBlockedPkg = ""
     private var lastHomeAttemptMs = 0L
@@ -102,7 +102,7 @@ class GuardService : Service() {
     override fun onCreate() {
         super.onCreate()
         createChannel()
-        startForeground(NOTIF_ID, buildNotification("管控服务启动中…"))
+        startForeground(NOTIF_ID, buildNotification("儿童设备管控", "管控服务启动中…"))
         overlay = LockOverlay(this)
 
         val filter = IntentFilter().apply {
@@ -380,47 +380,83 @@ class GuardService : Service() {
             overlayError = StateBus.overlayError
         )
         StateBus.status = status
-        if (now - lastNotificationMs >= 5_000L) {
-            lastNotificationMs = now
-            updateNotification(status, cfg)
-        }
+        // 两项数值精确到秒，通知必须每秒刷新；updateNotification 内部按内容去重，
+        // 避免窗口事件触发的即时心跳在同一秒内重复 notify
+        updateNotification(status, cfg)
     }
 
     private fun createChannel() {
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val ch = NotificationChannel(CHANNEL_ID, "管控状态", NotificationManager.IMPORTANCE_LOW)
-        ch.description = "显示剩余时长、休息倒计时与锁定原因"
+        ch.description = "显示两项精确到时 / 分 / 秒的剩余时长、休息倒计时与锁定原因"
         ch.setSound(null, null)
         nm.createNotificationChannel(ch)
     }
 
-    private fun buildNotification(text: String): Notification {
+    /**
+     * @brief 构建常驻通知
+     *
+     * 折叠状态两行分别显示「可用时长」与「单次连续剩余」两项秒级数值，
+     * 下拉展开后用 BigTextStyle 同时展示两项数值及已用、状态、休息等信息，
+     * 无需打开应用即可查看；setOnlyAlertOnce 保证每秒刷新不产生提示音或振动。
+     */
+    private fun buildNotification(title: String, text: String, bigText: String = ""): Notification {
         val pi = PendingIntent.getActivity(
             this, 0,
             Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-        return Notification.Builder(this, CHANNEL_ID)
+        val builder = Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_shield)
-            .setContentTitle("儿童设备管控")
+            .setContentTitle(title)
             .setContentText(text)
             .setContentIntent(pi)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .build()
+        if (bigText.isNotEmpty()) {
+            builder.setStyle(
+                Notification.BigTextStyle()
+                    .setBigContentTitle("儿童设备管控 · 实时计时")
+                    .bigText(bigText)
+            )
+        }
+        return builder.build()
     }
 
+    /** @brief 每秒刷新通知：下拉后折叠与展开都能同时看到两项精确到时 / 分 / 秒的数值 */
     private fun updateNotification(s: UiStatus, cfg: RulesConfig) {
-        val text = when {
+        val daily = if (s.dailyEnabled) Formatter.hmsFull(s.dailyRemainingMs) else "未启用"
+        val session = if (s.sessionEnabled) Formatter.hmsFull(s.sessionRemainingMs) else "未启用"
+        val title = "可用时长 $daily"
+        val text = "单次连续剩余 $session"
+        val stateText = when {
             !cfg.masterEnabled -> "管控总开关已关闭"
-            s.locked -> "${s.lockTitle}｜${s.lockReasons.firstOrNull().orEmpty()}"
-            s.restRemainingMs > 0L -> "休息倒计时 ${Formatter.hms(s.restRemainingMs)}"
-            s.dailyEnabled -> "今日剩余 ${Formatter.human(s.dailyRemainingMs)}"
-            else -> "管控运行中"
+            s.locked -> "已锁定 · ${s.lockTitle}"
+            else -> "设备可用"
         }
+        val nl = System.lineSeparator()
+        val lines = ArrayList<String>()
+        lines.add("可用时长：$daily")
+        lines.add("单次使用连续剩余时间：$session")
+        lines.add("今日已用：${Formatter.hmsFull(s.dailyUsedMs)}")
+        lines.add("本次已连续：${Formatter.hmsFull(s.continuousUsedMs)}")
+        lines.add("状态：$stateText")
+        if (s.locked && s.lockReasons.isNotEmpty()) {
+            lines.add("限制原因：" + s.lockReasons.joinToString("；"))
+        }
+        if (s.restRemainingMs > 0L) {
+            lines.add("休息倒计时：" + Formatter.hmsFull(s.restRemainingMs))
+        }
+        lines.add("当前应用：" + s.foregroundLabel)
+        val bigText = lines.joinToString(nl)
+
+        // 同一秒内窗口事件触发的即时心跳不重复刷新通知
+        val key = "$title|$text|$bigText"
+        if (key == lastNotificationKey) return
+        lastNotificationKey = key
         try {
             (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
-                .notify(NOTIF_ID, buildNotification(text))
+                .notify(NOTIF_ID, buildNotification(title, text, bigText))
         } catch (e: Exception) {
             Log.w(TAG, "更新通知失败: ${e.message}")
         }

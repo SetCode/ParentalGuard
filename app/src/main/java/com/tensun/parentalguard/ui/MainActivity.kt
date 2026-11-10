@@ -53,7 +53,9 @@ class MainActivity : Activity() {
     private lateinit var tvLockState: TextView
     private lateinit var tvLockReason: TextView
     private lateinit var tvDailyRemaining: TextView
+    private lateinit var tvDailyUsed: TextView
     private lateinit var tvSessionRemaining: TextView
+    private lateinit var tvSessionUsed: TextView
     private lateinit var tvRestCountdown: TextView
     private lateinit var tvForeground: TextView
     private lateinit var tvAppLimitsSummary: TextView
@@ -142,7 +144,9 @@ class MainActivity : Activity() {
         tvLockState = findViewById(R.id.tvLockState)
         tvLockReason = findViewById(R.id.tvLockReason)
         tvDailyRemaining = findViewById(R.id.tvDailyRemaining)
+        tvDailyUsed = findViewById(R.id.tvDailyUsed)
         tvSessionRemaining = findViewById(R.id.tvSessionRemaining)
+        tvSessionUsed = findViewById(R.id.tvSessionUsed)
         tvRestCountdown = findViewById(R.id.tvRestCountdown)
         tvForeground = findViewById(R.id.tvForeground)
         tvAppLimitsSummary = findViewById(R.id.tvAppLimitsSummary)
@@ -566,24 +570,27 @@ class MainActivity : Activity() {
         }
 
         if (cfg.dailyTotal.enabled) {
-            tvDailyRemaining.text = "${Formatter.human(s.dailyRemainingMs)}（已用 ${Formatter.human(s.dailyUsedMs)}）"
+            tvDailyRemaining.text = Formatter.hmsFull(s.dailyRemainingMs)
+            tvDailyUsed.text = "今日已用 ${Formatter.hmsFull(s.dailyUsedMs)}"
             pbDaily.progress = percent(s.dailyUsedMs, s.dailyLimitMs)
         } else {
             tvDailyRemaining.text = "未启用"
+            tvDailyUsed.text = "今日已用 ${Formatter.hmsFull(s.dailyUsedMs)}"
             pbDaily.progress = 0
         }
 
         if (cfg.session.enabled) {
-            tvSessionRemaining.text =
-                "${Formatter.human(s.sessionRemainingMs)}（已连续 ${Formatter.human(s.continuousUsedMs)}）"
+            tvSessionRemaining.text = Formatter.hmsFull(s.sessionRemainingMs)
+            tvSessionUsed.text = "本次已连续 ${Formatter.hmsFull(s.continuousUsedMs)}"
             pbSession.progress = percent(s.continuousUsedMs, s.sessionLimitMs)
         } else {
             tvSessionRemaining.text = "未启用"
+            tvSessionUsed.text = "本次已连续 ${Formatter.hmsFull(s.continuousUsedMs)}"
             pbSession.progress = 0
         }
 
         tvRestCountdown.text = if (s.restRemainingMs > 0L) {
-            "休息中，剩余 ${Formatter.hms(s.restRemainingMs)}"
+            "休息中，剩余 ${Formatter.hmsFull(s.restRemainingMs)}"
         } else {
             "未在休息"
         }

@@ -113,7 +113,7 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="今日设备剩余可用时长"
+                android:text="可用时长（时 / 分 / 秒）"
                 android:textColor="@color/text_sub"
                 android:textSize="12sp" />
 
@@ -127,6 +127,15 @@
                 android:textSize="22sp"
                 android:textStyle="bold" />
 
+            <TextView
+                android:id="@+id/tvDailyUsed"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="今日已用 --"
+                android:textColor="@color/text_sub"
+                android:textSize="12sp" />
+
             <ProgressBar
                 android:id="@+id/pbDaily"
                 style="?android:attr/progressBarStyleHorizontal"
@@ -139,7 +148,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
-                android:text="本次连续使用剩余时长"
+                android:text="单次使用连续剩余时间（时 / 分 / 秒）"
                 android:textColor="@color/text_sub"
                 android:textSize="12sp" />
 
@@ -152,6 +161,15 @@
                 android:textColor="@color/primary"
                 android:textSize="20sp"
                 android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvSessionUsed"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="本次已连续 --"
+                android:textColor="@color/text_sub"
+                android:textSize="12sp" />
 
             <ProgressBar
                 android:id="@+id/pbSession"
