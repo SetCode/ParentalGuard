@@ -106,6 +106,21 @@ object ShareSync {
         }
     }
 
+    /**
+     * @brief 时间重置后立即把新的重置纪元推送到局域网，并请求一次即时心跳
+     *
+     * 未配置对端地址时不发起网络请求，本机状态仍然完整重置（离线可用）。
+     */
+    fun onTimeReset() {
+        if (!inited) return
+        try {
+            requestSync(true)
+        } catch (e: Exception) {
+            // 同步异常不得影响本机重置结果
+        }
+        mainHandler.post { GuardService.requestTick() }
+    }
+
     /** @brief 请求一次同步；force=true 忽略节流（用于手动点击与启动恢复） */
     fun requestSync(force: Boolean = false) {
         if (!inited) return

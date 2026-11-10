@@ -56,6 +56,16 @@ data class DailyUsage(
         restFinishAnnounced = false
     }
 
+    /**
+     * @brief 恢复到项目预设的初始计时状态：当天日期 + 全部时间值归零 + 无片段 + 提示标志复位
+     *
+     * 与「新安装 / 跨天首次使用」完全一致的初始状态，供时间重置入口调用；
+     * 无论重置前处于计时进行中、暂停、强制休息、已用完还是数据异常，结果都相同。
+     */
+    fun resetToInitial(now: Long) {
+        resetFor(dateString(now))
+    }
+
     companion object {
         fun dateString(now: Long): String =
             SimpleDateFormat("yyyy-MM-dd", Locale.CHINA).format(Date(now))

@@ -90,6 +90,23 @@ object UsageRepository {
         if (ensureDate(s, now)) persist(ctx, s)
     }
 
+    /**
+     * @brief 时间重置：把当前监控对象的全部计时值恢复到项目预设的初始状态
+     *
+     * 覆盖的常见情况：计时进行中（丢弃未结算片段）、已暂停（丢弃暂停锚点）、
+     * 强制休息中（清除休息截止）、已结束（清除每日 / 单应用累计与锁定锚点）、
+     * 以及日期异常、时间戳回拨、持久化数据损坏等异常状态。
+     * 直接以全新初始对象覆盖缓存并立即落盘，因此重复重置保持幂等；
+     * 只写 pg_usage 分区，不触碰 pg_config、共享配置与任何其他业务数据。
+     */
+    fun resetAll(ctx: Context, now: Long) = synchronized(lockObj) {
+        val s = load(ctx)
+        s.resetToInitial(now)
+        // 以重置时刻作为片段结算锚点，避免第一次心跳把 0 误判为「长时间未提交」
+        s.lastCommitMs = now
+        persist(ctx, s)
+    }
+
     /** @brief 开机 / 服务重建：恢复同一天的计数并与系统使用情况数据对账 */
     fun onBoot(ctx: Context, now: Long) = synchronized(lockObj) {
         val s = load(ctx)

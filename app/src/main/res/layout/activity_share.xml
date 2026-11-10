@@ -139,6 +139,16 @@
             </LinearLayout>
 
             <TextView
+                android:id="@+id/tvServerName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="服务器名称：读取设备型号中…"
+                android:textColor="@color/text_main"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
                 android:id="@+id/tvLocalAddress"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -151,7 +161,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
-                android:text="开启后，同一局域网内其他安装了本应用的设备可连接此地址，读取并更新同一份共享数据集。端口修改后需重新开关一次服务器。"
+                android:text="服务器名称自动取本机设备型号，其他设备「自动发现」和连通性测试时显示的就是这个名称，无需手动填写。开启后，同一局域网内其他安装了本应用的设备可连接此地址，读取并更新同一份共享数据集。端口修改后需重新开关一次服务器。"
                 android:textColor="@color/text_sub"
                 android:textSize="11sp" />
         </LinearLayout>

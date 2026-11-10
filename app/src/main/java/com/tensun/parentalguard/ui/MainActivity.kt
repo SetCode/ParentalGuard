@@ -28,6 +28,7 @@ import com.tensun.parentalguard.core.KidPrompt
 import com.tensun.parentalguard.core.Permissions
 import com.tensun.parentalguard.core.RuleEngine
 import com.tensun.parentalguard.core.StateBus
+import com.tensun.parentalguard.core.TimeReset
 import com.tensun.parentalguard.core.UiStatus
 import com.tensun.parentalguard.core.UsageAccess
 import com.tensun.parentalguard.core.VoicePrompt
@@ -64,6 +65,7 @@ class MainActivity : Activity() {
     private lateinit var permContainer: LinearLayout
     private lateinit var rulesContainer: LinearLayout
     private lateinit var btnRefreshPerm: Button
+    private lateinit var btnResetTime: Button
     private lateinit var btnChangePin: Button
     private lateinit var btnShare: Button
     private lateinit var btnTestVoice: Button
@@ -155,6 +157,7 @@ class MainActivity : Activity() {
         permContainer = findViewById(R.id.permContainer)
         rulesContainer = findViewById(R.id.rulesContainer)
         btnRefreshPerm = findViewById(R.id.btnRefreshPerm)
+        btnResetTime = findViewById(R.id.btnResetTime)
         btnChangePin = findViewById(R.id.btnChangePin)
         btnShare = findViewById(R.id.btnShare)
         btnTestVoice = findViewById(R.id.btnTestVoice)
@@ -189,6 +192,13 @@ class MainActivity : Activity() {
             renderPermissions()
             GuardStarter.start(this)
             Toast.makeText(this, "已重新检测权限", Toast.LENGTH_SHORT).show()
+        }
+        btnResetTime.setOnClickListener {
+            if (!pinPassed) {
+                Toast.makeText(this, "请先通过家长验证", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            showResetConfirmDialog()
         }
         btnChangePin.setOnClickListener { showPinSettingDialog() }
         btnShare.setOnClickListener { startActivity(Intent(this, ShareActivity::class.java)) }
@@ -225,6 +235,36 @@ class MainActivity : Activity() {
             "内置中文语音：已就绪（随应用安装，无需设备语音引擎、无需联网）\n" +
                 VoicePrompt.volumeText(this)
         tvVoiceEngine.setTextColor(getColor(R.color.success))
+    }
+
+    // ---------------------------------------------------------------- 时间重置
+
+    /** @brief 明确的重置入口：二次确认列清会清零与不会改动的范围，避免误触 */
+    private fun showResetConfirmDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("重置今日计时")
+            .setMessage(
+                "将把当前监控对象的以下时间值恢复到初始状态：\n\n" +
+                    "• 今日设备总使用时长与已用时长\n" +
+                    "• 单次连续使用时长与剩余时间\n" +
+                    "• 强制休息倒计时\n" +
+                    "• 各应用今日累计时长\n" +
+                    "• 进行中的计时片段、暂停锚点与提醒标志\n\n" +
+                    "不会修改：管控规则、时长上限、应用白名单、单应用限额、家长密码、" +
+                    "提示方式、监控对象与局域网连接。\n\n" +
+                    "重置会同步到同一数据集的其他设备，且不可撤销。"
+            )
+            .setNegativeButton("取消", null)
+            .setPositiveButton("确认重置") { _, _ -> doResetTime() }
+            .show()
+    }
+
+    /** @brief 执行重置并立即刷新界面，结果无论成功失败都明确告知家长 */
+    private fun doResetTime() {
+        val r = TimeReset.perform(this)
+        cfg = ConfigRepository.get(this)
+        renderStatus()
+        Toast.makeText(this, r.message, Toast.LENGTH_LONG).show()
     }
 
     // ---------------------------------------------------------------- 规则卡片

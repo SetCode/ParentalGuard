@@ -65,6 +65,23 @@ class GuardService : Service() {
                 }
             }
         }
+
+        /**
+         * @brief 时间重置：清理进程内计时相关的运行态，并立即重算状态、遮罩与通知
+         *
+         * 服务未运行（live == null）时为空操作，界面按降级路径读取已清零的数据。
+         */
+        fun onTimeReset() {
+            val s = live ?: return
+            s.handler.post {
+                try {
+                    s.resetRuntimeState()
+                    s.tick()
+                } catch (e: Exception) {
+                    Log.w(TAG, "重置后刷新异常: ${e.message}")
+                }
+            }
+        }
     }
 
     private val handler = Handler(Looper.getMainLooper())
@@ -150,6 +167,22 @@ class GuardService : Service() {
         ticking = true
         handler.removeCallbacks(tickRunnable)
         handler.post(tickRunnable)
+    }
+
+    /**
+     * @brief 清空休息进度、锁定 / 拦截去重、通知去重缓存与全屏遮罩，回到刚启动时的运行态
+     *
+     * 这些值只在进程内保存，但会直接影响「已结束 / 休息中」等状态残留：
+     * 不清空会导致重置后遮罩不消失、通知仍显示旧数值、提示被去重键吞掉。
+     */
+    private fun resetRuntimeState() {
+        restTotalMs = 0L
+        lastLocked = false
+        lastBlockedPkg = ""
+        lastHomeAttemptMs = 0L
+        lastNotificationKey = ""
+        KidPrompt.clearThrottle()
+        if (::overlay.isInitialized) overlay.hide()
     }
 
     /** @brief 单次心跳：全部规则的判定与执行 */

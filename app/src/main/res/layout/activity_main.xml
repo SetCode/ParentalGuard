@@ -224,6 +224,46 @@
                 android:textSize="12sp" />
         </LinearLayout>
 
+        <!-- 时间重置 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:background="@drawable/bg_card"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="时间重置"
+                android:textColor="@color/text_main"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="把当前监控对象的今日已用时长、单次连续时长、强制休息倒计时和各应用累计恢复到初始状态。计时进行中、已暂停、休息中或已用完都可重置；不会修改任何规则、时长上限、白名单、家长密码或监控对象。"
+                android:textColor="@color/text_sub"
+                android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/btnResetTime"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="重置今日计时" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="需要家长验证，点击后会再次确认；重置会同步到同一数据集的其他设备，且不可撤销。"
+                android:textColor="@color/text_sub"
+                android:textSize="11sp" />
+        </LinearLayout>
+
         <!-- 权限 -->
         <LinearLayout
             android:layout_width="match_parent"

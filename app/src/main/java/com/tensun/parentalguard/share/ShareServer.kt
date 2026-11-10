@@ -130,7 +130,7 @@ object ShareServer {
                     val text = String(pkt.data, pkt.offset, pkt.length, StandardCharsets.UTF_8)
                     if (text != DISCOVERY_REQUEST) continue
                     val reply = (DISCOVERY_REPLY_PREFIX + boundPort + "|" +
-                            ShareStore.deviceId + "|" + ShareStore.settings.deviceName)
+                            ShareStore.deviceId + "|" + ShareStore.deviceName())
                         .toByteArray(StandardCharsets.UTF_8)
                     ds.send(DatagramPacket(reply, reply.size, pkt.address, pkt.port))
                 } catch (e: java.net.SocketTimeoutException) {
@@ -225,7 +225,7 @@ object ShareServer {
                 path == "/api/ping" && method == "GET" -> 200 to JSONObject()
                     .put("ok", true)
                     .put("deviceId", ShareStore.deviceId)
-                    .put("deviceName", ShareStore.settings.deviceName)
+                    .put("deviceName", ShareStore.deviceName())
                     .put("revision", ShareStore.revision())
                     .put("port", boundPort)
 

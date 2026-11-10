@@ -2,10 +2,12 @@
 """
 计时范围与局域网共享合并的性质自检（算法级验证，不依赖设备）。
 
-复刻 Kotlin 侧的三套核心规则：
+复刻 Kotlin 侧的核心规则：
 1) UsageRepository.sync 的前台片段结算（退出即暂停、重进即继续）；
 2) ShareStore / SubjectTiming 的按设备分量 CRDT 合并（不重复、不回退、不丢失）；
-3) RulesConfig / ConfigRepository 的「仅本机字段」隔离（上行剔除、下行保留）。
+3) RulesConfig / ConfigRepository 的「仅本机字段」隔离（上行剔除、下行保留）；
+4) 时间重置：DailyUsage 初始状态、重置纪元（epoch）裁决、幂等与写入范围；
+5) Formatter.hmsFull 的秒级展示与服务器名称取设备型号。
 
 运行：python tools/verify_timing.py
 """
@@ -421,9 +423,269 @@ def run_local_only_cases():
           and a2["dailyTotal"]["limitMinutes"] == b2["dailyTotal"]["limitMinutes"] == 45)
 
 
+# ---------------------------------------------------------------- 五、时间重置
+# 复刻 DailyUsage.resetToInitial / UsageRepository.resetAll /
+# ShareStore.resetActiveTiming / SubjectTiming.absorb 的重置纪元裁决
+TODAY = "2026-11-10"
+
+
+def new_reset_epoch(at_ms, device_id):
+    """复刻 newResetEpoch()：固定 20 位时间戳 + 设备 ID，字典序即新旧顺序"""
+    return "%020d|%s" % (max(0, at_ms), device_id)
+
+
+def reset_epoch_at_ms(epoch):
+    """复刻 resetEpochAtMs()：取回纪元时间戳，异常值回落 0"""
+    try:
+        return int(epoch.split("|", 1)[0])
+    except (ValueError, AttributeError):
+        return 0
+
+
+@dataclass
+class DailyState:
+    date: str = TODAY
+    total: int = 0
+    per_app: dict = field(default_factory=dict)
+    continuous: int = 0
+    rest_until: int = 0
+    seg_start: int = 0
+    seg_pkg: str = ""
+    screen_off_at: int = 0
+    last_commit: int = 0
+    warned_daily: bool = False
+    warned_session: bool = False
+    rest_finish_announced: bool = False
+
+    def as_tuple(self):
+        """排除 lastCommitMs（运行锚点，不影响任何展示时间值）后的完整状态"""
+        return (self.date, self.total, tuple(sorted(self.per_app.items())), self.continuous,
+                self.rest_until, self.seg_start, self.seg_pkg, self.screen_off_at,
+                self.warned_daily, self.warned_session, self.rest_finish_announced)
+
+    def reset_to_initial(self, now):
+        """复刻 DailyUsage.resetToInitial() + UsageRepository.resetAll()"""
+        self.date = TODAY
+        self.total = 0
+        self.per_app.clear()
+        self.continuous = 0
+        self.rest_until = 0
+        self.seg_start = 0
+        self.seg_pkg = ""
+        self.screen_off_at = 0
+        self.warned_daily = False
+        self.warned_session = False
+        self.rest_finish_announced = False
+        self.last_commit = now
+
+
+@dataclass
+class EpochClock:
+    total: int = 0
+    continuous: int = 0
+    per_app: dict = field(default_factory=dict)
+    updated: int = 0
+    epoch: str = ""
+
+    def absorb(self, o):
+        """复刻 DeviceClock.absorb()：跨纪元以较新者为准，同纪元逐字段取大"""
+        if o.epoch != self.epoch:
+            if o.epoch > self.epoch:
+                self.total, self.continuous = o.total, o.continuous
+                self.per_app = dict(o.per_app)
+                self.epoch = o.epoch
+                self.updated = o.updated
+            return
+        self.total = max(self.total, o.total)
+        self.continuous = max(self.continuous, o.continuous)
+        for p, v in o.per_app.items():
+            self.per_app[p] = max(self.per_app.get(p, 0), v)
+        self.updated = max(self.updated, o.updated)
+
+
+@dataclass
+class EpochTiming:
+    day: str = TODAY
+    clocks: dict = field(default_factory=dict)
+    last_update: int = 0
+    epoch: str = ""
+
+    def total(self):
+        return sum(c.total for c in self.clocks.values())
+
+    def absorb(self, o, today=TODAY):
+        """复刻 SubjectTiming.absorb()：先裁决纪元，再跨天，最后合并同纪元分量"""
+        target = max(self.epoch, o.epoch)
+        ours, theirs = self.day == today, o.day == today
+        if ours and not theirs:
+            if target > self.epoch:
+                self.epoch = target
+                self.clocks.clear()
+            self.last_update = max(self.last_update, o.last_update)
+            return
+        if not ours:
+            self.day = today
+            self.clocks.clear()
+            self.epoch = target
+            if not theirs:
+                self.last_update = max(self.last_update, o.last_update)
+                return
+        elif target != self.epoch:
+            self.epoch = target
+            self.clocks.clear()
+        else:
+            for k in [k for k, v in self.clocks.items() if v.epoch != target]:
+                del self.clocks[k]
+        for dev, c in o.clocks.items():
+            if c.epoch != target:
+                continue
+            if dev in self.clocks:
+                self.clocks[dev].absorb(c)
+            else:
+                self.clocks[dev] = EpochClock(c.total, c.continuous, dict(c.per_app), c.updated, c.epoch)
+        self.last_update = max(self.last_update, o.last_update)
+
+    def reset(self, now, device_id):
+        """复刻 ShareStore.resetActiveTiming()：清空分量并推进严格递增的纪元"""
+        at = max(now, reset_epoch_at_ms(self.epoch) + 1)
+        self.day = TODAY
+        self.clocks.clear()
+        self.epoch = new_reset_epoch(at, device_id)
+        self.last_update = now
+
+
+def reset_ledger(led, now):
+    """复刻 UsageRepository.resetAll() 对前台片段账本的效果"""
+    led.total = 0
+    led.continuous = 0
+    led.per_app.clear()
+    led.seg_start = 0
+    led.seg_pkg = ""
+    led.last_commit = now
+
+
+def perform_reset(prefs, ledger, timing, now, device_id):
+    """复刻 TimeReset.perform() 的写入范围：只动 pg_usage 与 pg_share 的计时部分"""
+    ledger.reset_to_initial(now)
+    prefs["pg_usage"] = json.dumps(
+        {"total": ledger.total, "continuous": ledger.continuous,
+         "restUntil": ledger.rest_until, "segment": ledger.seg_start}, sort_keys=True)
+    timing.reset(now, device_id)
+    prefs["pg_share"] = json.dumps({"epoch": timing.epoch, "clocks": {}}, sort_keys=True)
+    return ledger.as_tuple() == DailyState().as_tuple()
+
+
+def server_name(model):
+    """复刻 ShareStore.deviceName()：设备型号 + 清洗 UDP 分隔符 + 兜底"""
+    clean = (model or "").strip().replace("|", "/").replace("\n", " ").replace("\r", " ")[:64]
+    return clean or "Android 设备"
+
+
+def run_reset_cases():
+    print("=== 五、时间重置：初始状态 / 幂等 / 旧值不复活 / 不误改配置 ===")
+    initial = DailyState()
+
+    running = DailyState(total=180_000, continuous=180_000, per_app={APP_A: 180_000},
+                         seg_start=B + 190_000, seg_pkg=APP_A, warned_session=True)
+    running.reset_to_initial(B + 200_000)
+    check("R1 计时进行中：片段与全部累计归零", running.as_tuple() == initial.as_tuple())
+
+    paused = DailyState(total=90_000, continuous=90_000, per_app={APP_A: 90_000},
+                        screen_off_at=B + 100_000, warned_daily=True)
+    paused.reset_to_initial(B + 200_000)
+    check("R2 已暂停：重置结果与进行中完全一致", paused.as_tuple() == initial.as_tuple())
+
+    finished = DailyState(total=7_200_000, continuous=1_800_000,
+                          per_app={APP_A: 7_200_000}, rest_until=B + 900_000,
+                          warned_daily=True, warned_session=True, rest_finish_announced=True)
+    finished.reset_to_initial(B + 200_000)
+    check("R3 强制休息中 / 已用完：休息截止与全部提醒标志复位",
+          finished.as_tuple() == initial.as_tuple())
+
+    broken = DailyState(date="1970-01-01", total=-1, continuous=10 ** 15,
+                        per_app={APP_A: -5}, rest_until=B + 10 ** 12,
+                        seg_start=B - 10 ** 12, seg_pkg=APP_A,
+                        screen_off_at=10 ** 15, last_commit=10 ** 15,
+                        warned_daily=True, warned_session=True, rest_finish_announced=True)
+    broken.reset_to_initial(B + 200_000)
+    check("R4 日期 / 时间戳 / 损坏数据异常时仍回到同一初始状态",
+          broken.as_tuple() == initial.as_tuple())
+
+    again = DailyState(total=1_000, seg_start=B + 205_000, seg_pkg=APP_A)
+    again.reset_to_initial(B + 210_000)
+    again.reset_to_initial(B + 211_000)
+    check("R5 重复重置幂等，不重复累计、不回退",
+          again.as_tuple() == initial.as_tuple())
+
+    cfg_text = json.dumps(full_config(daily=90, session=25), sort_keys=True)
+    prefs = {"pg_config": cfg_text, "pg_usage": "{}", "pg_share": "{}"}
+    led_state = DailyState(total=60_000, seg_start=B + 1)
+    timing_state = EpochTiming()
+    ok = perform_reset(prefs, led_state, timing_state, B + 200_000, "devA")
+    check("R6 重置成功且只写计时分区，配置文本原封不动",
+          ok and prefs["pg_config"] == cfg_text and "pg_config" in prefs)
+
+    led = Ledger()
+    for t in range(0, 60_000, 1000):
+        sync(led, B + t, APP_A, True, True, countable)
+    sync(led, B + 60_000, HOME, True, True, countable)
+    reset_ledger(led, B + 70_000)
+    for t in range(70_000, 100_000, 1000):
+        sync(led, B + t, APP_A, True, True, countable)
+    total, cont, per = snapshot(led, B + 100_000)
+    check("R7 重置后重新计时只累计新片段，不含重置前用量",
+          total == 30_000 and cont == 30_000 and per.get(APP_A) == 30_000,
+          "total=%s" % total)
+
+    shared = EpochTiming()
+    shared.clocks["devA"] = EpochClock(120_000, 120_000, {APP_A: 120_000}, 1, "")
+    shared.clocks["devB"] = EpochClock(60_000, 60_000, {APP_B: 60_000}, 2, "")
+    check("R8 重置前两设备合计 180s", shared.total() == 180_000)
+    shared.reset(B + 200_000, "devA")
+    check("R9 共享层重置：全部分量清零并生成新纪元",
+          shared.total() == 0 and shared.clocks == {} and shared.epoch != "")
+
+    stale = EpochTiming()
+    stale.clocks["devB"] = EpochClock(60_000, 60_000, {APP_B: 60_000}, 3, "")
+    shared.absorb(stale)
+    check("R10 旧设备回放旧纪元数据不复活已清零时长", shared.total() == 0)
+
+    fresh = EpochTiming(epoch=shared.epoch)
+    fresh.clocks["devA"] = EpochClock(10_000, 10_000, {APP_A: 10_000}, 4, shared.epoch)
+    shared.absorb(fresh)
+    check("R11 重置后新纪元计时正常累计，不回退", shared.total() == 10_000)
+
+    first_epoch = shared.epoch
+    shared.reset(B + 200_000, "devA")
+    check("R12 同一毫秒重复重置纪元仍严格递增且结果一致",
+          shared.epoch > first_epoch and shared.total() == 0)
+
+    other = EpochTiming()
+    other.clocks["devA"] = EpochClock(99_000, 99_000, {}, 5, "")
+    shared.reset(B + 210_000, "devA")
+    check("R13 重置当前对象不影响其他监控对象计时", other.total() == 99_000)
+
+    shared.clocks["devA"] = EpochClock(5_000, 5_000, {}, 6, shared.epoch)
+    shared.day = "2026-11-09"
+    cross = EpochTiming()
+    cross.clocks["devB"] = EpochClock(70_000, 70_000, {}, 7, "")
+    shared.absorb(cross)
+    check("R14 跨天后旧纪元分量仍不复活", shared.total() == 0 and shared.epoch != "")
+
+    check("R15 服务器名称取设备型号并清洗 UDP 分隔符",
+          server_name("Pixel 8 Pro") == "Pixel 8 Pro"
+          and "|" not in server_name("A|B\nC")
+          and server_name("") == "Android 设备")
+
+    check("R16 重置后两项剩余等于配置上限并精确到秒",
+          hms_full(90 * 60_000) == "01 时 30 分 00 秒"
+          and hms_full(25 * 60_000) == "00 时 25 分 00 秒")
+
+
 if __name__ == "__main__":
     run_timing_cases()
     run_share_cases()
     run_display_cases()
     run_local_only_cases()
+    run_reset_cases()
     print("ALL CHECKS PASSED")

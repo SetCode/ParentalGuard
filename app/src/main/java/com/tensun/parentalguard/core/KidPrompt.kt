@@ -120,4 +120,15 @@ object KidPrompt {
         lastAt = 0L
         fire(ctx, cfg, Event.TEST, "test_" + System.currentTimeMillis())
     }
+
+    /**
+     * @brief 时间重置时清空提示节流
+     *
+     * 重置前最后一次「时间用完 / 休息中」的播报会占用去重键 2.5 秒，
+     * 若不清除，重置后短时间内再次触发同类提示会被误判为重复而静默。
+     */
+    fun clearThrottle() {
+        lastKey = ""
+        lastAt = 0L
+    }
 }

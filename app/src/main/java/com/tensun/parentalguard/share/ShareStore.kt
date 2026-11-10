@@ -63,6 +63,7 @@ object ShareStore {
         }
         deviceId = id
 
+        // 服务器名称固定使用设备型号：忽略持久化里的历史自定义值，保证局域网内各端展示一致
         settings = try {
             val o = JSONObject(p.getString(KEY_SETTINGS, null).orEmpty().ifEmpty { "{}" })
             ShareSettings(
@@ -70,10 +71,10 @@ object ShareStore {
                 port = o.optInt("port", 8765).coerceIn(1024, 65535),
                 peerUrl = o.optString("peerUrl", ""),
                 autoConnect = o.optBoolean("autoConnect", true),
-                deviceName = o.optString("deviceName", defaultDeviceName())
+                deviceName = deviceName()
             )
         } catch (e: Exception) {
-            ShareSettings(deviceName = defaultDeviceName())
+            ShareSettings(deviceName = deviceName())
         }
 
         state = try {
@@ -87,10 +88,18 @@ object ShareStore {
         // 首次运行创建一个默认对象，沿用现有本地配置与计时数据，保证兼容老版本
         if (state.subjects.isEmpty()) {
             val now = System.currentTimeMillis()
-            val r = SubjectRecord(id = "default", name = "默认设备", createdAtMs = now, updatedAtMs = now, writerId = id)
+            val r = SubjectRecord(id = "default", name = deviceName(), createdAtMs = now, updatedAtMs = now, writerId = id)
             r.configJson = com.tensun.parentalguard.data.ConfigRepository.currentShareJson(appCtx)
-            r.addHistory(ChangeRecord(now, id, settings.deviceName, "create", "创建默认监控对象", 0L))
+            r.addHistory(ChangeRecord(now, id, deviceName(), "create", "创建默认监控对象", 0L))
             state.subjects[r.id] = r
+        }
+        // 旧版本默认对象叫「默认设备」；迁移为设备型号，仅处理本机创建且仍为初始名的对象
+        state.subjects["default"]?.let { d ->
+            if (d.name == "默认设备" && d.writerId == id) {
+                d.name = deviceName()
+                d.updatedAtMs = System.currentTimeMillis()
+                d.writerId = id
+            }
         }
 
         // 迁移：旧版本共享数据集里可能存有已改为「仅本机」的字段，启动时统一剥离，
@@ -99,7 +108,21 @@ object ShareStore {
         persistLocked()
     }
 
-    private fun defaultDeviceName(): String = android.os.Build.MODEL?.take(32).orEmpty().ifEmpty { "Android 设备" }
+    /**
+     * @brief 服务器名称固定取设备型号（Build.MODEL）
+     *
+     * 剔除 UDP 发现报文的分隔符与换行，长度限制 64 字符；型号不可用时兜底为「Android 设备」。
+     * UDP 应答、ping 响应、更新记录与共享页展示统一从这里取值，避免各端名称不一致。
+     */
+    fun deviceName(): String {
+        val model = try {
+            android.os.Build.MODEL?.trim().orEmpty()
+        } catch (e: Exception) {
+            ""
+        }
+        return model.replace('|', '/').replace('\n', ' ').replace('\r', ' ').take(64)
+            .ifEmpty { "Android 设备" }
+    }
 
     /** @brief 剥离共享数据集中可能残留的「仅本机」字段，保证持久化与 HTTP 报文都不含这两项 */
     private fun sanitizeConfigsLocked() {
@@ -117,7 +140,7 @@ object ShareStore {
                 put("port", settings.port)
                 put("peerUrl", settings.peerUrl)
                 put("autoConnect", settings.autoConnect)
-                put("deviceName", settings.deviceName)
+                put("deviceName", deviceName())
             }.toString())
             .apply()
     }
@@ -163,7 +186,7 @@ object ShareStore {
         )
         r.configJson = com.tensun.parentalguard.data.ConfigRepository.currentShareJson(appCtx)
         r.timing = SubjectTiming(day = shareToday(now))
-        r.addHistory(ChangeRecord(now, deviceId, settings.deviceName, "create", "创建监控对象「$clean」", state.revision + 1))
+        r.addHistory(ChangeRecord(now, deviceId, deviceName(), "create", "创建监控对象「$clean」", state.revision + 1))
         state.subjects[r.id] = r
         bumpLocked()
         persistLocked()
@@ -179,7 +202,7 @@ object ShareStore {
         r.name = clean
         r.updatedAtMs = now
         r.writerId = deviceId
-        r.addHistory(ChangeRecord(now, deviceId, settings.deviceName, "rename", "重命名为「$clean」", state.revision + 1))
+        r.addHistory(ChangeRecord(now, deviceId, deviceName(), "rename", "重命名为「$clean」", state.revision + 1))
         bumpLocked()
         persistLocked()
         true
@@ -194,7 +217,7 @@ object ShareStore {
         r.deletedAtMs = now
         r.updatedAtMs = now
         r.writerId = deviceId
-        r.addHistory(ChangeRecord(now, deviceId, settings.deviceName, "delete", "删除监控对象", state.revision + 1))
+        r.addHistory(ChangeRecord(now, deviceId, deviceName(), "delete", "删除监控对象", state.revision + 1))
         bumpLocked()
         persistLocked()
         true
@@ -207,7 +230,7 @@ object ShareStore {
         val now = System.currentTimeMillis()
         com.tensun.parentalguard.data.ConfigRepository.switchScope(appCtx, id, r.configJson)
         com.tensun.parentalguard.data.UsageRepository.switchScope(appCtx, id, "")
-        r.addHistory(ChangeRecord(now, deviceId, settings.deviceName, "switch", "切换到「${r.name}」", state.revision + 1))
+        r.addHistory(ChangeRecord(now, deviceId, deviceName(), "switch", "切换到「${r.name}」", state.revision + 1))
         bumpLocked()
         persistLocked()
         true
@@ -229,7 +252,7 @@ object ShareStore {
         r.configWriterId = deviceId
         r.updatedAtMs = now
         r.writerId = deviceId
-        r.addHistory(ChangeRecord(now, deviceId, settings.deviceName, "config", "更新本对象配置", state.revision + 1))
+        r.addHistory(ChangeRecord(now, deviceId, deviceName(), "config", "更新本对象配置", state.revision + 1))
         bumpLocked()
         persistLocked()
         true
@@ -251,8 +274,19 @@ object ShareStore {
     ): Unit = synchronized(lockObj) {
         val r = state.subjects[activeId()]?.takeIf { !it.deleted } ?: return@synchronized
         val today = shareToday(now)
-        if (r.timing.day != today) r.timing = SubjectTiming(day = today)
-        val c = r.timing.clocks[deviceId] ?: DeviceClock().also { r.timing.clocks[deviceId] = it }
+        // 跨天清零时保留重置纪元，避免旧纪元分量在跨天后重新混入
+        if (r.timing.day != today) {
+            r.timing = SubjectTiming(day = today, epoch = r.timing.epoch)
+        }
+        val c = r.timing.clocks[deviceId]
+            ?: DeviceClock(epoch = r.timing.epoch).also { r.timing.clocks[deviceId] = it }
+        if (c.epoch != r.timing.epoch) {
+            // 本设备分量属于旧纪元（本机或其他设备刚执行过时间重置），从零重建
+            c.totalMs = 0L
+            c.continuousMs = 0L
+            c.perAppMs.clear()
+            c.epoch = r.timing.epoch
+        }
         val before = c.totalMs
         c.totalMs = maxOf(c.totalMs, totalMs.coerceIn(0L, MAX_DURATION_MS))
         c.continuousMs = maxOf(c.continuousMs, continuousMs.coerceIn(0L, MAX_DURATION_MS))
@@ -268,9 +302,34 @@ object ShareStore {
         if (c.totalMs > before && now - lastTimingLogAt >= 30_000L) {
             lastTimingLogAt = now
             r.addHistory(
-                ChangeRecord(now, deviceId, settings.deviceName, "timing", "累计使用时长更新", state.revision)
+                ChangeRecord(now, deviceId, deviceName(), "timing", "累计使用时长更新", state.revision)
             )
         }
+    }
+
+    /**
+     * @brief 时间重置：清空当前监控对象的全部计时分量并推进重置纪元
+     *
+     * 新纪元严格大于现有纪元（设备时钟回拨时取「现有纪元时间戳 + 1」），
+     * 于是其他设备随后上报的旧纪元分量会在合并时被丢弃，不会把已清零的时长拉回。
+     * 只替换当前对象的 timing 并写一条更新记录，不改配置、不改元数据、
+     * 不触碰其他监控对象；重复重置的结果与首次重置完全一致。
+     */
+    fun resetActiveTiming(now: Long): Boolean = synchronized(lockObj) {
+        if (!::appCtx.isInitialized) return@synchronized false
+        val r = state.subjects[activeId()]?.takeIf { !it.deleted } ?: return@synchronized false
+        val at = maxOf(now, resetEpochAtMs(r.timing.epoch) + 1L)
+        r.timing = SubjectTiming(
+            day = shareToday(now),
+            epoch = newResetEpoch(at, deviceId),
+            lastUpdateMs = now
+        )
+        r.addHistory(
+            ChangeRecord(now, deviceId, deviceName(), "reset_time", "重置当前监控对象的全部计时", state.revision + 1)
+        )
+        bumpLocked()
+        persistLocked()
+        true
     }
 
     fun flush(): Unit = synchronized(lockObj) { persistLocked() }
@@ -279,7 +338,7 @@ object ShareStore {
     fun addEvent(action: String, detail: String): Unit = synchronized(lockObj) {
         val r = state.subjects[activeId()]?.takeIf { !it.deleted } ?: return@synchronized
         r.addHistory(
-            ChangeRecord(System.currentTimeMillis(), deviceId, settings.deviceName, action, detail, state.revision)
+            ChangeRecord(System.currentTimeMillis(), deviceId, deviceName(), action, detail, state.revision)
         )
         persistLocked()
     }

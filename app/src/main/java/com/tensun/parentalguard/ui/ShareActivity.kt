@@ -39,6 +39,7 @@ class ShareActivity : Activity() {
     private lateinit var tvLastSync: TextView
     private lateinit var swServer: Switch
     private lateinit var etPort: EditText
+    private lateinit var tvServerName: TextView
     private lateinit var tvLocalAddress: TextView
     private lateinit var etPeerUrl: EditText
     private lateinit var tvDiscovered: TextView
@@ -85,6 +86,7 @@ class ShareActivity : Activity() {
         tvLastSync = findViewById(R.id.tvLastSync)
         swServer = findViewById(R.id.swServer)
         etPort = findViewById(R.id.etPort)
+        tvServerName = findViewById(R.id.tvServerName)
         tvLocalAddress = findViewById(R.id.tvLocalAddress)
         etPeerUrl = findViewById(R.id.etPeerUrl)
         tvDiscovered = findViewById(R.id.tvDiscovered)
@@ -222,6 +224,7 @@ class ShareActivity : Activity() {
 
     private fun renderServer() {
         val s = ShareStore.settings
+        tvServerName.text = "服务器名称：${ShareStore.deviceName()}（取自设备型号）"
         tvLocalAddress.text = if (ShareServer.isRunning()) {
             "本机地址：http://${ShareServer.localIpAddress()}:${s.port}（其他设备填写此地址）"
         } else {
@@ -343,6 +346,7 @@ class ShareActivity : Activity() {
         "connect" -> "连接"
         "disconnect" -> "断开"
         "server" -> "服务器"
+        "reset_time" -> "时间重置"
         else -> a
     }
 

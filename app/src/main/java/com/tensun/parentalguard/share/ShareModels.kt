@@ -3,6 +3,7 @@ package com.tensun.parentalguard.share
 import com.tensun.parentalguard.model.DailyUsage
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.Locale
 
 /** 单个监控对象保留的更新记录条数上限 */
 const val MAX_HISTORY = 50
@@ -12,6 +13,18 @@ const val MAX_SUBJECTS = 100
 
 /** 单次时长字段的合理上限（30 天），用于数据校验 */
 const val MAX_DURATION_MS = 30L * 24 * 60 * 60 * 1000L
+
+/**
+ * @brief 生成一次时间重置的纪元标识
+ *
+ * 固定 20 位毫秒时间戳 + 发起设备 ID，因此字符串字典序就是纪元的新旧顺序；
+ * 空串表示「从未重置」的初始纪元，比任何非空纪元都旧。
+ */
+fun newResetEpoch(atMs: Long, deviceId: String): String =
+    String.format(Locale.CHINA, "%020d|%s", atMs.coerceAtLeast(0L), deviceId)
+
+/** @brief 取回纪元中的时间戳，用于设备时钟回拨时生成严格递增的新纪元 */
+fun resetEpochAtMs(epoch: String): Long = epoch.substringBefore("|").toLongOrNull() ?: 0L
 
 /** @brief 更新记录：谁、何时、做了什么、当时的数据版本 */
 data class ChangeRecord(
@@ -59,7 +72,9 @@ data class DeviceClock(
     var perAppMs: MutableMap<String, Long> = HashMap(),
     var timingActive: Boolean = false,
     var timingPackage: String = "",
-    var updatedAtMs: Long = 0L
+    var updatedAtMs: Long = 0L,
+    /** 该分量所属的时间重置纪元；空串为初始纪元，不同纪元的计数不可相加 */
+    var epoch: String = ""
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("totalMs", totalMs)
@@ -67,11 +82,29 @@ data class DeviceClock(
         put("timingActive", timingActive)
         put("timingPackage", timingPackage)
         put("updatedAtMs", updatedAtMs)
+        put("epoch", epoch)
         put("perAppMs", JSONObject().also { o -> perAppMs.forEach { (k, v) -> o.put(k, v) } })
     }
 
-    /** @brief 与另一台设备上报的同一分量合并：只增不减，状态取较新的一条 */
+    /**
+     * @brief 与另一台设备上报的同一分量合并：同纪元只增不减，跨纪元以较新纪元为准
+     *
+     * 旧纪元分量一律丢弃，避免设备重置后其他设备回放的旧用量把计数拉回；
+     * 若远端纪元更新，则整体采用远端分量（旧纪元计数已作废，不能相加）。
+     */
     fun absorb(other: DeviceClock) {
+        if (other.epoch != epoch) {
+            if (other.epoch > epoch) {
+                totalMs = other.totalMs
+                continuousMs = other.continuousMs
+                perAppMs = HashMap(other.perAppMs)
+                epoch = other.epoch
+                timingActive = other.timingActive
+                timingPackage = other.timingPackage
+                updatedAtMs = other.updatedAtMs
+            }
+            return
+        }
         totalMs = maxOf(totalMs, other.totalMs)
         continuousMs = maxOf(continuousMs, other.continuousMs)
         for ((pkg, ms) in other.perAppMs) {
@@ -91,7 +124,8 @@ data class DeviceClock(
                 continuousMs = o.optLong("continuousMs", 0L).coerceIn(0L, MAX_DURATION_MS),
                 timingActive = o.optBoolean("timingActive", false),
                 timingPackage = o.optString("timingPackage", ""),
-                updatedAtMs = o.optLong("updatedAtMs", 0L)
+                updatedAtMs = o.optLong("updatedAtMs", 0L),
+                epoch = o.optString("epoch", "")
             )
             o.optJSONObject("perAppMs")?.let { obj ->
                 val it = obj.keys()
@@ -111,7 +145,9 @@ data class DeviceClock(
 data class SubjectTiming(
     var day: String = "",
     var clocks: MutableMap<String, DeviceClock> = HashMap(),
-    var lastUpdateMs: Long = 0L
+    var lastUpdateMs: Long = 0L,
+    /** 当前计时集合所属的重置纪元；每次时间重置都会推进，旧纪元分量一律失效 */
+    var epoch: String = ""
 ) {
     /** @brief 全局累计设备总时长 = 各设备分量之和 */
     fun globalTotalMs(): Long = clocks.values.sumOf { it.totalMs }
@@ -133,26 +169,52 @@ data class SubjectTiming(
     fun latestUpdateMs(): Long =
         maxOf(lastUpdateMs, clocks.values.maxOfOrNull { it.updatedAtMs } ?: 0L)
 
-    /** @brief 合并远端计时集合；跨天时以较新日期为准，旧日分量整体清零 */
+    /**
+     * @brief 合并远端计时集合：先按重置纪元裁决，再按跨天规则处理，最后按设备分量合并
+     *
+     * 纪元较新的一侧为准，旧纪元分量全部淘汰，因此时间重置后即使其他设备
+     * 回放重置前的旧数据，也不会把已清零的时长恢复；两侧同为最新纪元时，
+     * 仍按「逐字段取较大值」的 G-Counter 规则，保证不重复、不回退、不丢失。
+     */
     fun absorb(other: SubjectTiming, today: String) {
+        val targetEpoch = maxOf(epoch, other.epoch)
         val oursValid = day == today
         val theirsValid = other.day == today
+
         if (oursValid && !theirsValid) {
+            // 远端是旧日期：只接收它的重置纪元，不带回任何旧日分量
+            if (targetEpoch > epoch) {
+                epoch = targetEpoch
+                clocks.clear()
+            }
             lastUpdateMs = maxOf(lastUpdateMs, other.lastUpdateMs)
             return
         }
-        if (!oursValid && theirsValid) {
+        if (!oursValid) {
+            // 跨天：统一到今天从零开始，保留较新的重置纪元
             day = today
             clocks.clear()
-        } else if (!oursValid && !theirsValid) {
-            // 两边都不是今天，保留时间戳较新的一侧并统一到今天重新开始
-            day = today
-            clocks.clear()
-            lastUpdateMs = maxOf(lastUpdateMs, other.lastUpdateMs)
-            return
+            epoch = targetEpoch
+            if (!theirsValid) {
+                lastUpdateMs = maxOf(lastUpdateMs, other.lastUpdateMs)
+                return
+            }
+        } else {
+            // 两侧都是今天：淘汰不属于最新纪元的分量
+            if (targetEpoch != epoch) {
+                epoch = targetEpoch
+                clocks.clear()
+            } else {
+                val it = clocks.entries.iterator()
+                while (it.hasNext()) {
+                    if (it.next().value.epoch != targetEpoch) it.remove()
+                }
+            }
         }
+
         for ((dev, remote) in other.clocks) {
             if (dev.isEmpty() || dev.length > 128) continue
+            if (remote.epoch != targetEpoch) continue
             val local = clocks[dev]
             if (local == null) clocks[dev] = remote else local.absorb(remote)
         }
@@ -162,6 +224,7 @@ data class SubjectTiming(
     fun toJson(): JSONObject = JSONObject().apply {
         put("day", day)
         put("lastUpdateMs", lastUpdateMs)
+        put("epoch", epoch)
         put("clocks", JSONObject().also { o ->
             clocks.forEach { (k, v) -> o.put(k, v.toJson()) }
         })
@@ -171,7 +234,8 @@ data class SubjectTiming(
         fun fromJson(o: JSONObject): SubjectTiming {
             val t = SubjectTiming(
                 day = o.optString("day", ""),
-                lastUpdateMs = o.optLong("lastUpdateMs", 0L)
+                lastUpdateMs = o.optLong("lastUpdateMs", 0L),
+                epoch = o.optString("epoch", "")
             )
             o.optJSONObject("clocks")?.let { obj ->
                 val it = obj.keys()
