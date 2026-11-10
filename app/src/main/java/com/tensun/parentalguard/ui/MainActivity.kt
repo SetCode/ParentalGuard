@@ -235,12 +235,14 @@ class MainActivity : Activity() {
         enabledOf: (RulesConfig) -> Boolean,
         summaryOf: (RulesConfig) -> String,
         onToggle: (Boolean) -> Unit,
-        onAction: () -> Unit
+        onAction: () -> Unit,
+        localOnly: Boolean = false
     ) {
         val v = LayoutInflater.from(this).inflate(R.layout.item_rule_card, rulesContainer, false)
         val sw = v.findViewById<Switch>(R.id.ruleSwitch)
         val summary = v.findViewById<TextView>(R.id.ruleSummary)
-        v.findViewById<TextView>(R.id.ruleTitle).text = title
+        v.findViewById<TextView>(R.id.ruleTitle).text =
+            if (localOnly) "$title · 仅本机" else title
         val btn = v.findViewById<Button>(R.id.ruleAction)
         btn.text = actionLabel
         sw.setOnCheckedChangeListener { _, checked ->
@@ -251,7 +253,11 @@ class MainActivity : Activity() {
         btn.setOnClickListener { onAction() }
         v.setOnClickListener { sw.isChecked = !sw.isChecked }
         rulesContainer.addView(v)
-        ruleCards.add(RuleCardRef(sw, summary, enabledOf, summaryOf))
+        val renderedSummary: (RulesConfig) -> String = { c ->
+            val s = summaryOf(c)
+            if (localOnly) "$s\n仅本机生效，不同步到局域网其他设备" else s
+        }
+        ruleCards.add(RuleCardRef(sw, summary, enabledOf, renderedSummary))
     }
 
     private fun buildRuleCards() {
@@ -309,7 +315,8 @@ class MainActivity : Activity() {
             onToggle = { v -> ConfigRepository.update(this) { c -> c.whitelist.enabled = v } },
             onAction = {
                 startActivity(Intent(this, WhitelistActivity::class.java))
-            }
+            },
+            localOnly = true
         )
 
         addRuleCard(

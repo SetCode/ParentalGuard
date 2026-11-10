@@ -18,7 +18,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
-        android:text="勾选允许打开的应用；未勾选的应用启动后会被立即拦截并返回桌面。系统桌面与管控应用始终自动允许。"
+        android:text="勾选允许打开的应用；未勾选的应用启动后会被立即拦截并返回桌面。系统桌面与管控应用始终自动允许。此设置仅本机生效，不同步到局域网其他设备。"
         android:textColor="@color/text_sub"
         android:textSize="12sp" />
 

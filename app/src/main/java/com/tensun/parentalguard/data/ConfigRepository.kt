@@ -85,35 +85,59 @@ object ConfigRepository {
         }
     }
 
-    /** @brief 当前配置的 JSON 文本，作为共享数据集里的配置快照 */
+    /** @brief 本机完整配置 JSON，只用于本地，绝不写入共享数据集 */
     fun currentJson(ctx: Context): String = get(ctx).toJson().toString()
+
+    /** @brief 局域网共享配置快照：已剔除「启用全部管控规则」与「应用白名单」 */
+    fun currentShareJson(ctx: Context): String = get(ctx).toShareJson().toString()
 
     fun currentScope(): String = scope
 
-    /** @brief 用服务器裁决后的配置覆盖当前分区，不回写共享层（避免同步环） */
-    fun replaceFromJson(ctx: Context, json: String) {
-        val cfg = try {
+    /**
+     * @brief 应用服务器裁决后的共享配置，不回写共享层（避免同步环）
+     *
+     * 共享字段覆盖本机，但「启用全部管控规则 / 应用白名单」始终保持本机值，
+     * 因此任何设备同步都不会改动其他设备的这两项设置。
+     */
+    fun applyShareJson(ctx: Context, json: String) {
+        if (json.isBlank()) return
+        val shared = try {
             RulesConfig.fromJson(JSONObject(json))
         } catch (e: Exception) {
             return
         }
-        synchronized(this) { saveInternal(ctx, cfg) }
+        synchronized(this) {
+            val local = get(ctx)
+            local.copyLocalOnlyTo(shared)
+            // toJson() 的键顺序固定，可直接做文本比对：8 秒一次的同步若内容未变，
+            // 不重复写盘、不重复刷新界面，也不打断家长正在进行的编辑。
+            if (shared.toJson().toString() != local.toJson().toString()) {
+                saveInternal(ctx, shared)
+            }
+        }
     }
 
-    /** @brief 切换监控对象分区；新分区首次使用时载入该对象已保存的配置 */
-    fun switchScope(ctx: Context, id: String, configJson: String) {
+    /**
+     * @brief 切换监控对象分区
+     *
+     * 新分区首次使用时载入该对象的共享配置，并沿用本机当前的仅本机字段，
+     * 避免切换 / 新建对象时把本机的总开关和白名单重置掉。
+     */
+    fun switchScope(ctx: Context, id: String, shareJson: String) {
         synchronized(this) {
             val target = if (id == "default") "" else id
             if (scope == target) return
+            val carry = get(ctx)
             scope = target
             cached = null
             val prefs = sp(ctx)
             if (prefs.getString(KEY, null).isNullOrBlank()) {
-                val cfg = if (configJson.isNotEmpty()) {
-                    try { RulesConfig.fromJson(JSONObject(configJson)) } catch (e: Exception) { RulesConfig() }
+                val cfg = if (shareJson.isNotEmpty()) {
+                    try { RulesConfig.fromJson(JSONObject(shareJson)) } catch (e: Exception) { RulesConfig() }
                 } else {
                     RulesConfig()
                 }
+                carry.copyLocalOnlyTo(cfg)
                 prefs.edit().putString(KEY, cfg.toJson().toString()).apply()
             }
             cached = null

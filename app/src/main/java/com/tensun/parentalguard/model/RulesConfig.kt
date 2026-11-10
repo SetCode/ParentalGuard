@@ -84,8 +84,43 @@ data class RulesConfig(
         })
     }
 
+    /** @brief 生成局域网共享用的配置快照：剔除「仅本机生效」的字段 */
+    fun toShareJson(): JSONObject = shareSnapshot(toJson())
+
+    /** @brief 把「仅本机生效」的字段从本机配置复制到目标配置 */
+    fun copyLocalOnlyTo(target: RulesConfig) {
+        target.masterEnabled = masterEnabled
+        target.whitelist.enabled = whitelist.enabled
+        target.whitelist.packages.clear()
+        target.whitelist.packages.addAll(whitelist.packages)
+    }
+
     companion object {
         const val SCHEMA = 1
+
+        /** 仅本机生效、不参与局域网共享的字段：启用全部管控规则 + 应用白名单 */
+        val LOCAL_ONLY_KEYS = arrayOf("masterEnabled", "whitelist")
+
+        private const val SHARE_MARK = "localFieldsOmitted"
+
+        /** @brief 从任意配置 JSON 生成共享快照，用于上行上报与旧数据集归一化 */
+        fun shareSnapshot(full: JSONObject): JSONObject {
+            val o = JSONObject(full.toString())
+            LOCAL_ONLY_KEYS.forEach { o.remove(it) }
+            o.put(SHARE_MARK, true)
+            return o
+        }
+
+        /** @brief 剥离历史共享数据集里残留的仅本机字段，返回可直接存库的规范化文本 */
+        fun normalizeShareJson(json: String): String {
+            if (json.isBlank()) return ""
+            return try {
+                val o = JSONObject(json)
+                if (o.optBoolean(SHARE_MARK, false)) json else shareSnapshot(o).toString()
+            } catch (e: Exception) {
+                ""
+            }
+        }
 
         fun fromJson(o: JSONObject): RulesConfig {
             val cfg = RulesConfig()

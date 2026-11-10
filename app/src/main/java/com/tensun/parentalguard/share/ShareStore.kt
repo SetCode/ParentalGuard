@@ -88,14 +88,25 @@ object ShareStore {
         if (state.subjects.isEmpty()) {
             val now = System.currentTimeMillis()
             val r = SubjectRecord(id = "default", name = "默认设备", createdAtMs = now, updatedAtMs = now, writerId = id)
-            r.configJson = com.tensun.parentalguard.data.ConfigRepository.currentJson(appCtx)
+            r.configJson = com.tensun.parentalguard.data.ConfigRepository.currentShareJson(appCtx)
             r.addHistory(ChangeRecord(now, id, settings.deviceName, "create", "创建默认监控对象", 0L))
             state.subjects[r.id] = r
         }
+
+        // 迁移：旧版本共享数据集里可能存有已改为「仅本机」的字段，启动时统一剥离，
+        // 避免这两项设置继续在网络上传输，也避免旧客户端读到后误用。
+        sanitizeConfigsLocked()
         persistLocked()
     }
 
     private fun defaultDeviceName(): String = android.os.Build.MODEL?.take(32).orEmpty().ifEmpty { "Android 设备" }
+
+    /** @brief 剥离共享数据集中可能残留的「仅本机」字段，保证持久化与 HTTP 报文都不含这两项 */
+    private fun sanitizeConfigsLocked() {
+        for (sub in state.subjects.values) {
+            sub.configJson = com.tensun.parentalguard.model.RulesConfig.normalizeShareJson(sub.configJson)
+        }
+    }
 
     private fun persistLocked() {
         val s = sp()
@@ -150,7 +161,7 @@ object ShareStore {
             id = UUID.randomUUID().toString(), name = clean,
             createdAtMs = now, updatedAtMs = now, writerId = deviceId
         )
-        r.configJson = com.tensun.parentalguard.data.ConfigRepository.currentJson(appCtx)
+        r.configJson = com.tensun.parentalguard.data.ConfigRepository.currentShareJson(appCtx)
         r.timing = SubjectTiming(day = shareToday(now))
         r.addHistory(ChangeRecord(now, deviceId, settings.deviceName, "create", "创建监控对象「$clean」", state.revision + 1))
         state.subjects[r.id] = r
@@ -189,7 +200,7 @@ object ShareStore {
         true
     }
 
-    /** @brief 切换激活对象：切换本地引擎的独立数据分区，并载入该对象的配置 */
+    /** @brief 切换激活对象：切换本地引擎的独立数据分区，并载入该对象的共享配置 */
     fun switchSubject(id: String): Boolean = synchronized(lockObj) {
         val r = state.subjects[id] ?: return@synchronized false
         if (r.deleted) return@synchronized false
@@ -202,9 +213,16 @@ object ShareStore {
         true
     }
 
-    /** @brief 本地配置变更：写入当前对象并提升版本 */
-    fun recordConfigChange(configJson: String): Unit = synchronized(lockObj) {
-        val r = activeSubject() ?: return@synchronized
+    /**
+     * @brief 本地配置变更：仅在「共享字段」实际变化时写入当前对象并提升版本
+     *
+     * 仅本机字段（启用全部管控规则 / 应用白名单）的修改不会改变共享 JSON，
+     * 因此不会刷新 configUpdatedAtMs、不写更新记录、不发起同步，
+     * 也不会用较新的时间戳压过其他设备真正的配置变更。
+     */
+    fun recordConfigChange(configJson: String): Boolean = synchronized(lockObj) {
+        val r = activeSubject() ?: return@synchronized false
+        if (r.configJson == configJson) return@synchronized false
         val now = System.currentTimeMillis()
         r.configJson = configJson
         r.configUpdatedAtMs = now
@@ -214,6 +232,7 @@ object ShareStore {
         r.addHistory(ChangeRecord(now, deviceId, settings.deviceName, "config", "更新本对象配置", state.revision + 1))
         bumpLocked()
         persistLocked()
+        true
     }
 
     /**
@@ -295,6 +314,7 @@ object ShareStore {
                 if (concurrent) conflicts.add("对象「${local.name}」被多台设备同时修改，已自动合并")
             }
         }
+        sanitizeConfigsLocked()
         bumpLocked()
         if (r.serverDeviceId.isNotEmpty()) state.serverDeviceId = r.serverDeviceId
         persistLocked()
@@ -305,6 +325,7 @@ object ShareStore {
     fun replaceWith(newState: SharedState): Unit = synchronized(lockObj) {
         state = newState
         if (state.serverDeviceId.isEmpty()) state.serverDeviceId = deviceId
+        sanitizeConfigsLocked()
         persistLocked()
     }
 

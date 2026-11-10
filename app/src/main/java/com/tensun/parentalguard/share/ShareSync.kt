@@ -74,12 +74,12 @@ object ShareSync {
         mainHandler.post { GuardService.requestTick() }
     }
 
-    /** @brief 本地配置发生任何修改时调用 */
+    /** @brief 本地配置发生修改时调用：仅共享字段变化才上报并触发同步 */
     fun onLocalConfigChanged() {
         if (!inited) return
         try {
-            ShareStore.recordConfigChange(ConfigRepository.currentJson(appCtx))
-            requestSync(false)
+            val changed = ShareStore.recordConfigChange(ConfigRepository.currentShareJson(appCtx))
+            if (changed) requestSync(false)
         } catch (e: Exception) {
             // 共享层异常不得影响本地配置保存
         }
@@ -155,7 +155,7 @@ object ShareSync {
     /** @brief 把服务端裁决后的配置应用到本地引擎（不触发回写，避免同步环） */
     private fun applyRemoteConfig() {
         val s = ShareStore.activeSubject() ?: return
-        if (s.configJson.isNotEmpty()) ConfigRepository.replaceFromJson(appCtx, s.configJson)
+        if (s.configJson.isNotEmpty()) ConfigRepository.applyShareJson(appCtx, s.configJson)
     }
 
     /** @brief 手动探测服务器连通性 */
