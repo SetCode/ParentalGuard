@@ -64,6 +64,21 @@ if [ -z "$GRADLE_BIN" ]; then
 fi
 echo "Gradle：$GRADLE_BIN"
 
+# GitHub 偶发 TLS 握手失败（schannel: failed to receive handshake），
+# push 必须重试，否则一次网络抖动就会中断整个发布流程
+push_with_retry() {
+    local ref="$1" i out
+    for i in 1 2 3 4 5; do
+        if out=$(git push origin "$ref" 2>&1); then
+            printf '%s\n' "$out" | tail -1
+            return 0
+        fi
+        printf 'push 第 %d 次失败：%s\n' "$i" "$(printf '%s' "$out" | tail -1)" >&2
+        sleep 3
+    done
+    return 1
+}
+
 # ---------------------------------------------------------------- 1. 版本号
 CUR_NAME=$(grep -E '^versionName=' version.properties | cut -d= -f2 | tr -d ' \r')
 CUR_CODE=$(grep -E '^versionCode=' version.properties | cut -d= -f2 | tr -d ' \r')
@@ -96,9 +111,14 @@ if [ "$ALLOW_DIRTY" -eq 0 ] && [ -n "$(git status --porcelain)" ]; then
     fi
 fi
 
+# tag 已存在时：指向当前 HEAD 视为上次发布中断的残留，允许继续；指向别的提交则拒绝
 if [ "$DO_PUSH" -eq 1 ] && git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
-    echo "tag v$VERSION 已存在，请先删除或改用新版本号" >&2
-    exit 1
+    if [ "$(git rev-parse "v$VERSION^{}")" = "$(git rev-parse HEAD)" ]; then
+        echo "tag v$VERSION 已存在且指向当前提交，按续跑处理"
+    else
+        echo "tag v$VERSION 已指向其他提交，请删除或改用新版本号" >&2
+        exit 1
+    fi
 fi
 
 # ---------------------------------------------------------------- 3. 写入版本号
@@ -180,10 +200,18 @@ printf '%s\n' "$NOTES" > dist/release-notes.md
 if [ "$DO_PUSH" -eq 1 ]; then
     echo "== 提交版本号与安装包，打 tag =="
     git add version.properties "$OUT" "$OUT.sha256"
-    git commit -m "发布 v$VERSION：提交签名安装包与校验值"
-    git tag -a "v$VERSION" -m "ParentalGuard v$VERSION"
-    git push origin HEAD
-    git push origin "v$VERSION"
+    if git diff --cached --quiet; then
+        echo "工作区无变更需要提交（续跑场景），跳过提交"
+    else
+        git commit -m "发布 v$VERSION：提交签名安装包与校验值"
+    fi
+    if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+        echo "tag v$VERSION 已存在，跳过创建"
+    else
+        git tag -a "v$VERSION" -m "ParentalGuard v$VERSION"
+    fi
+    push_with_retry HEAD || { echo "推送 master 失败，请检查网络后重试本脚本" >&2; exit 1; }
+    push_with_retry "v$VERSION" || { echo "推送 tag v$VERSION 失败，请检查网络后重试本脚本" >&2; exit 1; }
     echo "已推送 tag v$VERSION，CI 将校验产物并创建 Release（无需任何 Secret）"
 fi
 
