@@ -99,6 +99,48 @@ data class ReleaseInfo(
     val publishedAt: String
 )
 
+/**
+ * @brief 把 GitHub 返回的 ISO8601 时间转成本机时区可读文本
+ *
+ * API 里的 published_at 是 UTC（形如 2026-11-20T15:05:00Z），直接截断显示会误导家长，
+ * 这里按设备时区换算；解析失败时退回原字符串，不影响更新提示本身。
+ */
+internal fun formatPublishTime(iso: String): String {
+    if (iso.isEmpty()) return ""
+    return try {
+        java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+            .withZone(java.time.ZoneId.systemDefault())
+            .format(java.time.Instant.parse(iso))
+    } catch (e: Exception) {
+        iso.replace('T', ' ').removeSuffix("Z")
+    }
+}
+
+/**
+ * @brief 把 Release 说明里的 Markdown 标记压成纯文本
+ *
+ * 发布说明由 CI 用 Markdown 写（在 GitHub 页面上渲染），但对话框只有 TextView，
+ * 直接把 `## 标题`、`**加粗**`、反引号显示出来会像乱码。这里做最小化清理：
+ * 丢掉标题行、去掉强调符号、列表项换成「·」，并折叠多余空行。
+ */
+internal fun toPlainNotes(raw: String): String {
+    if (raw.isBlank()) return ""
+    val out = StringBuilder()
+    for (line in raw.lines()) {
+        val s = line.trim()
+        if (s.isEmpty()) {
+            out.append('\n')
+            continue
+        }
+        // 标题行与正文首行重复（对话框已经显示版本号），整行丢弃
+        if (s.startsWith("#")) continue
+        val text = s.replace("**", "").replace("`", "").trim()
+        if (text.isEmpty()) continue
+        out.append(if (text.startsWith("- ")) "· " + text.substring(2) else text).append('\n')
+    }
+    return out.toString().replace(Regex("\n{3,}"), "\n\n").trim()
+}
+
 /** @brief 检查结果：四类情况各自独立，界面据此给出可区分原因的提示 */
 sealed class UpdateResult {
 
@@ -208,7 +250,7 @@ object UpdateChecker {
 
         if (cmp <= 0) return UpdateResult.Latest(current, latest)
 
-        val notes = json.optString("body").trim().let {
+        val notes = toPlainNotes(json.optString("body")).let {
             if (it.length > MAX_NOTES) it.take(MAX_NOTES) + "\n…（完整说明见发布页）" else it
         }
         val pageUrl = json.optString("html_url").trim().ifEmpty { ReleaseRepo.RELEASES_PAGE }

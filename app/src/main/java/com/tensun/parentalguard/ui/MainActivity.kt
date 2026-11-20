@@ -40,6 +40,7 @@ import com.tensun.parentalguard.update.AppVersion
 import com.tensun.parentalguard.update.UpdateChecker
 import com.tensun.parentalguard.update.UpdatePrefs
 import com.tensun.parentalguard.update.UpdateResult
+import com.tensun.parentalguard.update.formatPublishTime
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -726,7 +727,7 @@ class MainActivity : Activity() {
             append("当前版本：").append(result.current).append('\n')
             append("最新版本：v").append(info.version)
             if (info.publishedAt.isNotEmpty()) {
-                append('\n').append("发布时间：").append(info.publishedAt.replace('T', ' ').removeSuffix("Z"))
+                append('\n').append("发布时间：").append(formatPublishTime(info.publishedAt))
             }
             append("\n\n")
             append(info.notes.ifEmpty { "本次发布未填写说明，可打开发布页查看详情。" })
