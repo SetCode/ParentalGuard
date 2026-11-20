@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 分页标签文字色：选中为主色，未选中为次级灰 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/primary" android:state_selected="true" />
+    <item android:color="@color/text_sub" />
+</selector>

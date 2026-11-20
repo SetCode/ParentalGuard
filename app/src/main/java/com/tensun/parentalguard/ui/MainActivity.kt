@@ -52,6 +52,10 @@ class MainActivity : Activity() {
 
         /** @brief 启动时自动检查更新的最小间隔，避免每次冷启动都访问 GitHub */
         private const val AUTO_CHECK_INTERVAL_MS = 12L * 60 * 60 * 1000
+
+        /** @brief 分页偏好：记住家长上次停留的页面 */
+        private const val PREFS_UI = "pg_ui"
+        private const val KEY_PAGE = "mainPage"
     }
 
     private lateinit var cfg: RulesConfig
@@ -84,6 +88,9 @@ class MainActivity : Activity() {
     private lateinit var tvVersionInfo: TextView
     private lateinit var tvUpdateStatus: TextView
     private lateinit var btnCheckUpdate: Button
+    private lateinit var tabs: List<TextView>
+    private lateinit var pages: List<View>
+    private var currentPage = 0
 
     private val handler = Handler(Looper.getMainLooper())
     private var refreshing = false
@@ -130,6 +137,8 @@ class MainActivity : Activity() {
         renderStatus()
         renderPermissions()
         renderVersionInfo()
+        // 恢复上次停留的页面；首次进入固定落在概览页
+        showPage(getSharedPreferences(PREFS_UI, MODE_PRIVATE).getInt(KEY_PAGE, 0), persist = false)
         askPinIfNeeded()
         // 自动检查放在密码门之后：有密码时由验证成功回调触发，避免提示框压在验证框上
         maybeAutoUpdateCheck()
@@ -183,9 +192,41 @@ class MainActivity : Activity() {
         tvVersionInfo = findViewById(R.id.tvVersionInfo)
         tvUpdateStatus = findViewById(R.id.tvUpdateStatus)
         btnCheckUpdate = findViewById(R.id.btnCheckUpdate)
+        // 分页标签与页面容器：索引一一对应，切换时只改可见性
+        tabs = listOf(
+            findViewById(R.id.tabOverview),
+            findViewById(R.id.tabRules),
+            findViewById(R.id.tabPrompt),
+            findViewById(R.id.tabSettings)
+        )
+        pages = listOf(
+            findViewById(R.id.pageOverview),
+            findViewById(R.id.pageRules),
+            findViewById(R.id.pagePrompt),
+            findViewById(R.id.pageSettings)
+        )
+    }
+
+    /** @brief 切换分页：只改可见性与标签选中态，各页滚动位置与已绑定视图都保留 */
+    private fun showPage(index: Int, persist: Boolean = true) {
+        val i = index.coerceIn(0, pages.size - 1)
+        val changed = i != currentPage
+        currentPage = i
+        for (idx in pages.indices) {
+            pages[idx].visibility = if (idx == i) View.VISIBLE else View.GONE
+            tabs[idx].isSelected = idx == i
+        }
+        if (persist) {
+            getSharedPreferences(PREFS_UI, MODE_PRIVATE).edit().putInt(KEY_PAGE, i).apply()
+        }
+        // 回到概览页时刷新一次，避免看到离开期间停留的旧数值
+        if (i == 0 && changed) renderStatus()
     }
 
     private fun setupListeners() {
+        tabs.forEachIndexed { index, tab ->
+            tab.setOnClickListener { showPage(index) }
+        }
         swMaster.setOnCheckedChangeListener { _, checked ->
             if (updatingUi) return@setOnCheckedChangeListener
             ConfigRepository.update(this) { it.masterEnabled = checked }

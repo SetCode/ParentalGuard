@@ -1,567 +1,742 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<!--
+  主界面：固定头部 + 四个分页（概览 / 规则 / 提示 / 设置）。
+  分页只切可见性，不销毁视图，1 秒刷新与状态渲染逻辑不变。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/bg_page"
-    android:fillViewport="true">
+    android:orientation="vertical">
 
+    <!-- 头部：标题固定不随页面滚动 -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="12dp"
+        android:layout_marginEnd="16dp"
+        android:text="儿童设备管控"
+        android:textColor="@color/text_main"
+        android:textSize="20sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="2dp"
+        android:layout_marginEnd="16dp"
+        android:text="家长端 · 规则配置与实时状态"
+        android:textColor="@color/text_sub"
+        android:textSize="12sp" />
+
+    <!-- 分页标签 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp">
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="16dp"
+        android:background="@drawable/bg_tabbar"
+        android:orientation="horizontal">
 
         <TextView
-            android:layout_width="match_parent"
+            android:id="@+id/tabOverview"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="儿童设备管控"
-            android:textColor="@color/text_main"
-            android:textSize="26sp"
-            android:textStyle="bold" />
+            android:layout_weight="1"
+            android:background="@drawable/bg_tab"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:paddingTop="9dp"
+            android:paddingBottom="9dp"
+            android:text="概览"
+            android:textColor="@color/tab_text"
+            android:textSize="14sp" />
 
         <TextView
-            android:layout_width="match_parent"
+            android:id="@+id/tabRules"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:layout_marginBottom="16dp"
-            android:text="家长端 · 规则配置与实时状态"
-            android:textColor="@color/text_sub"
-            android:textSize="13sp" />
+            android:layout_weight="1"
+            android:background="@drawable/bg_tab"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:paddingTop="9dp"
+            android:paddingBottom="9dp"
+            android:text="规则"
+            android:textColor="@color/tab_text"
+            android:textSize="14sp" />
 
-        <!-- 总开关 -->
-        <LinearLayout
-            android:layout_width="match_parent"
+        <TextView
+            android:id="@+id/tabPrompt"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            android:background="@drawable/bg_card"
-            android:orientation="vertical">
+            android:layout_weight="1"
+            android:background="@drawable/bg_tab"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:paddingTop="9dp"
+            android:paddingBottom="9dp"
+            android:text="提示"
+            android:textColor="@color/tab_text"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/tabSettings"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="@drawable/bg_tab"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:paddingTop="9dp"
+            android:paddingBottom="9dp"
+            android:text="设置"
+            android:textColor="@color/tab_text"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <!-- 页面容器：同一时刻只显示一个页面 -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <!-- ============================ 页面 1：概览 ============================ -->
+        <ScrollView
+            android:id="@+id/pageOverview"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
+                android:orientation="vertical"
+                android:paddingStart="16dp"
+                android:paddingTop="12dp"
+                android:paddingEnd="16dp"
+                android:paddingBottom="16dp">
+
+                <!-- 总开关 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"
+                    android:background="@drawable/bg_card"
+                    android:orientation="vertical">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="启用全部管控规则"
+                            android:textColor="@color/text_main"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+
+                        <Switch
+                            android:id="@+id/swMaster"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="true" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tvGuardRunning"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="服务状态检测中…"
+                        android:textColor="@color/text_sub"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="仅本机生效，不同步到局域网其他设备"
+                        android:textColor="@color/text_sub"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <!-- 实时状态 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"
+                    android:background="@drawable/bg_card"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="实时状态"
+                        android:textColor="@color/text_main"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvLockState"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="状态：正常"
+                        android:textColor="@color/success"
+                        android:textSize="17sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvLockReason"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="当前无限制"
+                        android:textColor="@color/text_sub"
+                        android:textSize="13sp" />
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginTop="12dp"
+                        android:layout_marginBottom="12dp"
+                        android:background="@color/divider" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="可用时长（时 / 分 / 秒）"
+                        android:textColor="@color/text_sub"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:id="@+id/tvDailyRemaining"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="--"
+                        android:textColor="@color/primary"
+                        android:textSize="22sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvDailyUsed"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="今日已用 --"
+                        android:textColor="@color/text_sub"
+                        android:textSize="12sp" />
+
+                    <ProgressBar
+                        android:id="@+id/pbDaily"
+                        style="?android:attr/progressBarStyleHorizontal"
+                        android:layout_width="match_parent"
+                        android:layout_height="8dp"
+                        android:layout_marginTop="4dp"
+                        android:max="100" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="单次使用连续剩余时间（时 / 分 / 秒）"
+                        android:textColor="@color/text_sub"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:id="@+id/tvSessionRemaining"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="--"
+                        android:textColor="@color/primary"
+                        android:textSize="20sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvSessionUsed"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="本次已连续 --"
+                        android:textColor="@color/text_sub"
+                        android:textSize="12sp" />
+
+                    <ProgressBar
+                        android:id="@+id/pbSession"
+                        style="?android:attr/progressBarStyleHorizontal"
+                        android:layout_width="match_parent"
+                        android:layout_height="8dp"
+                        android:layout_marginTop="4dp"
+                        android:max="100" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="强制休息倒计时"
+                        android:textColor="@color/text_sub"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:id="@+id/tvRestCountdown"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="--"
+                        android:textColor="@color/warning"
+                        android:textSize="20sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvForeground"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="前台应用：未知"
+                        android:textColor="@color/text_sub"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:id="@+id/tvAppLimitsSummary"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="单应用限额：未配置"
+                        android:textColor="@color/text_sub"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <!-- 时间重置 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_card"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="时间重置"
+                        android:textColor="@color/text_main"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="把当前监控对象的今日已用时长、单次连续时长、强制休息倒计时和各应用累计恢复到初始状态。计时进行中、已暂停、休息中或已用完都可重置；不会修改任何规则、时长上限、白名单、家长密码或监控对象。"
+                        android:textColor="@color/text_sub"
+                        android:textSize="12sp" />
+
+                    <Button
+                        android:id="@+id/btnResetTime"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="重置今日计时" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="需要家长验证，点击后会再次确认；重置会同步到同一数据集的其他设备，且不可撤销。"
+                        android:textColor="@color/text_sub"
+                        android:textSize="11sp" />
+                </LinearLayout>
+            </LinearLayout>
+        </ScrollView>
+
+        <!-- ============================ 页面 2：规则 ============================ -->
+        <ScrollView
+            android:id="@+id/pageRules"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingStart="16dp"
+                android:paddingTop="12dp"
+                android:paddingEnd="16dp"
+                android:paddingBottom="16dp">
 
                 <TextView
-                    android:layout_width="0dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="启用全部管控规则"
+                    android:layout_marginBottom="8dp"
+                    android:text="管控规则（叠加生效，冲突时按更严格规则执行）"
                     android:textColor="@color/text_main"
-                    android:textSize="16sp"
+                    android:textSize="15sp"
                     android:textStyle="bold" />
 
-                <Switch
-                    android:id="@+id/swMaster"
-                    android:layout_width="wrap_content"
+                <LinearLayout
+                    android:id="@+id/rulesContainer"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:checked="true" />
-            </LinearLayout>
-
-            <TextView
-                android:id="@+id/tvGuardRunning"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="服务状态检测中…"
-                android:textColor="@color/text_sub"
-                android:textSize="12sp" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="仅本机生效，不同步到局域网其他设备"
-                android:textColor="@color/text_sub"
-                android:textSize="12sp" />
-        </LinearLayout>
-
-        <!-- 实时状态 -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            android:background="@drawable/bg_card"
-            android:orientation="vertical">
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="实时状态"
-                android:textColor="@color/text_main"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/tvLockState"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="状态：正常"
-                android:textColor="@color/success"
-                android:textSize="17sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/tvLockReason"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:text="当前无限制"
-                android:textColor="@color/text_sub"
-                android:textSize="13sp" />
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:layout_marginTop="12dp"
-                android:layout_marginBottom="12dp"
-                android:background="@color/divider" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="可用时长（时 / 分 / 秒）"
-                android:textColor="@color/text_sub"
-                android:textSize="12sp" />
-
-            <TextView
-                android:id="@+id/tvDailyRemaining"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="--"
-                android:textColor="@color/primary"
-                android:textSize="22sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/tvDailyUsed"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="今日已用 --"
-                android:textColor="@color/text_sub"
-                android:textSize="12sp" />
-
-            <ProgressBar
-                android:id="@+id/pbDaily"
-                style="?android:attr/progressBarStyleHorizontal"
-                android:layout_width="match_parent"
-                android:layout_height="8dp"
-                android:layout_marginTop="4dp"
-                android:max="100" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:text="单次使用连续剩余时间（时 / 分 / 秒）"
-                android:textColor="@color/text_sub"
-                android:textSize="12sp" />
-
-            <TextView
-                android:id="@+id/tvSessionRemaining"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="--"
-                android:textColor="@color/primary"
-                android:textSize="20sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/tvSessionUsed"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="本次已连续 --"
-                android:textColor="@color/text_sub"
-                android:textSize="12sp" />
-
-            <ProgressBar
-                android:id="@+id/pbSession"
-                style="?android:attr/progressBarStyleHorizontal"
-                android:layout_width="match_parent"
-                android:layout_height="8dp"
-                android:layout_marginTop="4dp"
-                android:max="100" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:text="强制休息倒计时"
-                android:textColor="@color/text_sub"
-                android:textSize="12sp" />
-
-            <TextView
-                android:id="@+id/tvRestCountdown"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="--"
-                android:textColor="@color/warning"
-                android:textSize="20sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/tvForeground"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:text="前台应用：未知"
-                android:textColor="@color/text_sub"
-                android:textSize="12sp" />
-
-            <TextView
-                android:id="@+id/tvAppLimitsSummary"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:text="单应用限额：未配置"
-                android:textColor="@color/text_sub"
-                android:textSize="12sp" />
-        </LinearLayout>
-
-        <!-- 时间重置 -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            android:background="@drawable/bg_card"
-            android:orientation="vertical">
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="时间重置"
-                android:textColor="@color/text_main"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="把当前监控对象的今日已用时长、单次连续时长、强制休息倒计时和各应用累计恢复到初始状态。计时进行中、已暂停、休息中或已用完都可重置；不会修改任何规则、时长上限、白名单、家长密码或监控对象。"
-                android:textColor="@color/text_sub"
-                android:textSize="12sp" />
-
-            <Button
-                android:id="@+id/btnResetTime"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="重置今日计时" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="需要家长验证，点击后会再次确认；重置会同步到同一数据集的其他设备，且不可撤销。"
-                android:textColor="@color/text_sub"
-                android:textSize="11sp" />
-        </LinearLayout>
-
-        <!-- 权限 -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            android:background="@drawable/bg_card"
-            android:orientation="vertical">
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="运行所需权限"
-                android:textColor="@color/text_main"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="缺少任一项都会在下方标红，点击后跳转到系统设置开启。"
-                android:textColor="@color/text_sub"
-                android:textSize="12sp" />
-
-            <LinearLayout
-                android:id="@+id/permContainer"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:orientation="vertical" />
-
-            <Button
-                android:id="@+id/btnRefreshPerm"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="重新检测权限" />
-        </LinearLayout>
-
-        <!-- 规则卡片容器 -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
-            android:text="管控规则（叠加生效，冲突时按更严格规则执行）"
-            android:textColor="@color/text_main"
-            android:textSize="15sp"
-            android:textStyle="bold" />
-
-        <LinearLayout
-            android:id="@+id/rulesContainer"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical" />
-
-        <!-- 儿童提示方式：图形 + 语音，均不依赖识字 -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:layout_marginBottom="24dp"
-            android:background="@drawable/bg_card"
-            android:orientation="vertical">
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="儿童提示方式（不识字也能看懂、听懂）"
-                android:textColor="@color/text_main"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="打开不允许的应用时会自动返回桌面，并用大图标、鲜艳颜色和应用内置的真人中文语音告诉孩子原因；文字只作家长辅助说明。"
-                android:textColor="@color/text_sub"
-                android:textSize="12sp" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
+                    android:orientation="vertical" />
 
                 <TextView
-                    android:layout_width="0dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="① 有声提示（总开关）"
-                    android:textColor="@color/text_main"
-                    android:textSize="15sp" />
-
-                <Switch
-                    android:id="@+id/swSound"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:checked="true" />
+                    android:layout_marginTop="12dp"
+                    android:text="提示：打开开关即可启用某项规则，点右侧按钮设置参数。白名单与总开关仅本机生效。"
+                    android:textColor="@color/text_sub"
+                    android:textSize="11sp" />
             </LinearLayout>
+        </ScrollView>
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="关闭后提示音、振动与语音全部静音，仍会显示图形提示、仍然执行限制。"
-                android:textColor="@color/text_sub"
-                android:textSize="11sp" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="② 人声语音（内置中文朗读）"
-                    android:textColor="@color/text_main"
-                    android:textSize="15sp" />
-
-                <Switch
-                    android:id="@+id/swVoice"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:checked="true" />
-            </LinearLayout>
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="例如朗读：「这个应用不能玩哦，已经帮你回到桌面啦」。语音已随应用打包，不需要设备语音引擎、不需要联网；关闭后改为普通提示音。"
-                android:textColor="@color/text_sub"
-                android:textSize="11sp" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="③ 拦截应用时出声提醒"
-                    android:textColor="@color/text_main"
-                    android:textSize="15sp" />
-
-                <Switch
-                    android:id="@+id/swBlockSound"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:checked="true" />
-            </LinearLayout>
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="白名单外 / 超额应用被拦截时是否发声；关闭后仍立即返回桌面，只是不发出声音。锁定与休息提醒不受此项影响。"
-                android:textColor="@color/text_sub"
-                android:textSize="11sp" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="④ 弹出图形提示"
-                    android:textColor="@color/text_main"
-                    android:textSize="15sp" />
-
-                <Switch
-                    android:id="@+id/swVisual"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:checked="true" />
-            </LinearLayout>
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="红色禁止 / 蓝色休息 / 绿色恢复的大图标卡片，约 2 秒后自动消失，不会挡住操作。"
-                android:textColor="@color/text_sub"
-                android:textSize="11sp" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:orientation="horizontal">
-
-                <Button
-                    android:id="@+id/btnTestVoice"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="试听提示" />
-
-                <Button
-                    android:id="@+id/btnTtsSettings"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:layout_weight="1"
-                    android:text="媒体音量设置" />
-            </LinearLayout>
-
-            <TextView
-                android:id="@+id/tvVoiceEngine"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="内置中文语音：已就绪"
-                android:textColor="@color/text_sub"
-                android:textSize="12sp" />
-
-            <Button
-                android:id="@+id/btnChangePin"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="修改家长密码" />
-
-            <Button
-                android:id="@+id/btnShare"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="局域网共享与监控对象" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="说明：本应用需保持后台运行。配置与当日计数保存在本机，重启后自动恢复；跨天自动清零每日计数。家长入口受密码保护，儿童无法修改规则。"
-                android:textColor="@color/text_sub"
-                android:textSize="12sp" />
-        </LinearLayout>
-
-        <!-- 版本与更新 -->
-        <LinearLayout
+        <!-- ============================ 页面 3：提示 ============================ -->
+        <ScrollView
+            android:id="@+id/pagePrompt"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            android:background="@drawable/bg_card"
-            android:orientation="vertical">
+            android:layout_height="match_parent"
+            android:fillViewport="true"
+            android:visibility="gone">
 
-            <TextView
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="版本与更新"
-                android:textColor="@color/text_main"
-                android:textSize="16sp"
-                android:textStyle="bold" />
+                android:orientation="vertical"
+                android:paddingStart="16dp"
+                android:paddingTop="12dp"
+                android:paddingEnd="16dp"
+                android:paddingBottom="16dp">
 
-            <TextView
-                android:id="@+id/tvVersionInfo"
+                <!-- 儿童提示方式：图形 + 语音，均不依赖识字 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"
+                    android:background="@drawable/bg_card"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="儿童提示方式（不识字也能看懂、听懂）"
+                        android:textColor="@color/text_main"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="打开不允许的应用时会自动返回桌面，并用大图标、鲜艳颜色和应用内置的真人中文语音告诉孩子原因；文字只作家长辅助说明。"
+                        android:textColor="@color/text_sub"
+                        android:textSize="12sp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="① 有声提示（总开关）"
+                            android:textColor="@color/text_main"
+                            android:textSize="15sp" />
+
+                        <Switch
+                            android:id="@+id/swSound"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="true" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="关闭后提示音、振动与语音全部静音，仍会显示图形提示、仍然执行限制。"
+                        android:textColor="@color/text_sub"
+                        android:textSize="11sp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="② 人声语音（内置中文朗读）"
+                            android:textColor="@color/text_main"
+                            android:textSize="15sp" />
+
+                        <Switch
+                            android:id="@+id/swVoice"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="true" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="例如朗读：「这个应用不能玩哦，已经帮你回到桌面啦」。语音已随应用打包，不需要设备语音引擎、不需要联网；关闭后改为普通提示音。"
+                        android:textColor="@color/text_sub"
+                        android:textSize="11sp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="③ 拦截应用时出声提醒"
+                            android:textColor="@color/text_main"
+                            android:textSize="15sp" />
+
+                        <Switch
+                            android:id="@+id/swBlockSound"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="true" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="白名单外 / 超额应用被拦截时是否发声；关闭后仍立即返回桌面，只是不发出声音。锁定与休息提醒不受此项影响。"
+                        android:textColor="@color/text_sub"
+                        android:textSize="11sp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="④ 弹出图形提示"
+                            android:textColor="@color/text_main"
+                            android:textSize="15sp" />
+
+                        <Switch
+                            android:id="@+id/swVisual"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="true" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="红色禁止 / 蓝色休息 / 绿色恢复的大图标卡片，约 2 秒后自动消失，不会挡住操作。"
+                        android:textColor="@color/text_sub"
+                        android:textSize="11sp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:orientation="horizontal">
+
+                        <Button
+                            android:id="@+id/btnTestVoice"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="试听提示" />
+
+                        <Button
+                            android:id="@+id/btnTtsSettings"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:layout_weight="1"
+                            android:text="媒体音量设置" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tvVoiceEngine"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="内置中文语音：已就绪"
+                        android:textColor="@color/text_sub"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <!-- 家长与局域网 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_card"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="家长保护与共享"
+                        android:textColor="@color/text_main"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/btnChangePin"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="修改家长密码" />
+
+                    <Button
+                        android:id="@+id/btnShare"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="局域网共享与监控对象" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="说明：本应用需保持后台运行。配置与当日计数保存在本机，重启后自动恢复；跨天自动清零每日计数。家长入口受密码保护，儿童无法修改规则。"
+                        android:textColor="@color/text_sub"
+                        android:textSize="12sp" />
+                </LinearLayout>
+            </LinearLayout>
+        </ScrollView>
+
+        <!-- ============================ 页面 4：设置 ============================ -->
+        <ScrollView
+            android:id="@+id/pageSettings"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true"
+            android:visibility="gone">
+
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="当前版本 1.0.0"
-                android:textColor="@color/text_main"
-                android:textSize="14sp" />
+                android:orientation="vertical"
+                android:paddingStart="16dp"
+                android:paddingTop="12dp"
+                android:paddingEnd="16dp"
+                android:paddingBottom="16dp">
 
-            <TextView
-                android:id="@+id/tvUpdateStatus"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="尚未检查更新"
-                android:textColor="@color/text_sub"
-                android:textSize="12sp" />
+                <!-- 权限 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"
+                    android:background="@drawable/bg_card"
+                    android:orientation="vertical">
 
-            <Button
-                android:id="@+id/btnCheckUpdate"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="检查更新" />
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="运行所需权限"
+                        android:textColor="@color/text_main"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:text="启动时会自动检查一次（每 12 小时最多一次）。仅访问 GitHub 读取版本号与发布说明，不上传任何本机数据。"
-                android:textColor="@color/text_sub"
-                android:textSize="11sp" />
-        </LinearLayout>
-    </LinearLayout>
-</ScrollView>
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="缺少任一项都会在下方标红，点击后跳转到系统设置开启。"
+                        android:textColor="@color/text_sub"
+                        android:textSize="12sp" />
+
+                    <LinearLayout
+                        android:id="@+id/permContainer"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:orientation="vertical" />
+
+                    <Button
+                        android:id="@+id/btnRefreshPerm"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="重新检测权限" />
+                </LinearLayout>
+
+                <!-- 版本与更新 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_card"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="版本与更新"
+                        android:textColor="@color/text_main"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvVersionInfo"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="当前版本 1.0.0"
+                        android:textColor="@color/text_main"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:id="@+id/tvUpdateStatus"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="尚未检查更新"
+                        android:textColor="@color/text_sub"
+                        android:textSize="12sp" />
+
+                    <Button
+                        android:id="@+id/btnCheckUpdate"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="检查更新" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="启动时会自动检查一次（每 12 小时最多一次）。仅访问 GitHub 读取版本号与发布说明，不上传任何本机数据。"
+                        android:textColor="@color/text_sub"
+                        android:textSize="11sp" />
+                </LinearLayout>
+            </LinearLayout>
+        </ScrollView>
+    </FrameLayout>
+</LinearLayout>
