@@ -61,19 +61,24 @@ jobs:
           echo "版本 $VERSION → versionCode $CODE"
 
       - name: 恢复发布签名
+        # 兼容两种存放位置：Settings → Secrets 或 Settings → Variables
         env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          KEYSTORE_PROPERTIES_BASE64: ${{ secrets.KEYSTORE_PROPERTIES_BASE64 }}
+          KS: ${{ secrets.KEYSTORE_BASE64 || vars.KEYSTORE_BASE64 }}
+          KSP: ${{ secrets.KEYSTORE_PROPERTIES_BASE64 || vars.KEYSTORE_PROPERTIES_BASE64 }}
         run: |
           set -euo pipefail
+          echo "密钥长度：KEYSTORE_BASE64=${#KS}，KEYSTORE_PROPERTIES_BASE64=${#KSP}"
           # 未签名 APK 无法安装，宁可让发布失败也不要放出一个装不上的包
-          if [ -z "${KEYSTORE_BASE64}" ] || [ -z "${KEYSTORE_PROPERTIES_BASE64}" ]; then
-            echo "::error::缺少 KEYSTORE_BASE64 / KEYSTORE_PROPERTIES_BASE64，拒绝发布未签名 APK"
-            echo "请在 Settings → Secrets and variables → Actions 中补充这两个 Secret（生成方式见 docs/RELEASE.md）"
+          if [ -z "${KS}" ] || [ -z "${KSP}" ]; then
+            echo "::error::KEYSTORE_BASE64 / KEYSTORE_PROPERTIES_BASE64 为空（长度分别为 ${#KS} / ${#KSP}）"
+            echo "请确认在 Settings → Secrets and variables → Actions 的【Secrets】页签（不是 Variables）新增这两个 Secret，"
+            echo "名字必须完全一致，生成方式见 docs/RELEASE.md"
             exit 1
           fi
-          echo "$KEYSTORE_BASE64" | base64 -d > release.jks
-          echo "$KEYSTORE_PROPERTIES_BASE64" | base64 -d > keystore.properties
+          echo "$KS" | base64 -d > release.jks
+          echo "$KSP" | base64 -d > keystore.properties
+          echo "签名文件大小：$(wc -c < release.jks) 字节 / $(wc -c < keystore.properties) 字节"
+          [ "$(wc -c < release.jks)" -gt 1000 ] || { echo "::error::release.jks 解码后过小，base64 内容可能被截断"; exit 1; }
           echo "签名配置已就绪"
 
       - name: 运行单元测试
