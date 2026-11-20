@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 次级按钮：白底 + 主色描边 + 主色字，带点击涟漪 -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="#1A2D6AE0">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/card" />
+            <stroke android:width="1dp" android:color="@color/primary" />
+            <corners android:radius="10dp" />
+        </shape>
+    </item>
+</ripple>

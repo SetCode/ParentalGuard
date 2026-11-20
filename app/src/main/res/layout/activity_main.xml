@@ -345,6 +345,8 @@
 
                     <Button
                         android:id="@+id/btnResetTime"
+                        android:background="@drawable/bg_btn_primary"
+                        android:textColor="@android:color/white"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"
@@ -568,6 +570,8 @@
 
                         <Button
                             android:id="@+id/btnTestVoice"
+                            android:background="@drawable/bg_btn_secondary"
+                            android:textColor="@color/primary"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
@@ -575,6 +579,8 @@
 
                         <Button
                             android:id="@+id/btnTtsSettings"
+                            android:background="@drawable/bg_btn_secondary"
+                            android:textColor="@color/primary"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="8dp"
@@ -609,6 +615,8 @@
 
                     <Button
                         android:id="@+id/btnChangePin"
+                        android:background="@drawable/bg_btn_secondary"
+                        android:textColor="@color/primary"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"
@@ -616,6 +624,8 @@
 
                     <Button
                         android:id="@+id/btnShare"
+                        android:background="@drawable/bg_btn_secondary"
+                        android:textColor="@color/primary"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
@@ -682,6 +692,8 @@
 
                     <Button
                         android:id="@+id/btnRefreshPerm"
+                        android:background="@drawable/bg_btn_secondary"
+                        android:textColor="@color/primary"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
@@ -723,6 +735,8 @@
 
                     <Button
                         android:id="@+id/btnCheckUpdate"
+                        android:background="@drawable/bg_btn_primary"
+                        android:textColor="@android:color/white"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"

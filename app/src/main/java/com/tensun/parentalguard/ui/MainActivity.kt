@@ -800,30 +800,37 @@ class MainActivity : Activity() {
             s.lockReasons.joinToString("\n") { "• $it" }
         }
 
+        // 规则关闭时用次要灰显示「未启用」并隐藏空进度条，避免抢走对真实数值的注意力
         if (cfg.dailyTotal.enabled) {
             tvDailyRemaining.text = Formatter.hmsFull(s.dailyRemainingMs)
-            tvDailyUsed.text = "今日已用 ${Formatter.hmsFull(s.dailyUsedMs)}"
+            tvDailyRemaining.setTextColor(getColor(R.color.primary))
+            pbDaily.visibility = View.VISIBLE
             pbDaily.progress = percent(s.dailyUsedMs, s.dailyLimitMs)
         } else {
             tvDailyRemaining.text = "未启用"
-            tvDailyUsed.text = "今日已用 ${Formatter.hmsFull(s.dailyUsedMs)}"
-            pbDaily.progress = 0
+            tvDailyRemaining.setTextColor(getColor(R.color.text_sub))
+            pbDaily.visibility = View.GONE
         }
+        tvDailyUsed.text = "今日已用 ${Formatter.hmsFull(s.dailyUsedMs)}"
 
         if (cfg.session.enabled) {
             tvSessionRemaining.text = Formatter.hmsFull(s.sessionRemainingMs)
-            tvSessionUsed.text = "本次已连续 ${Formatter.hmsFull(s.continuousUsedMs)}"
+            tvSessionRemaining.setTextColor(getColor(R.color.primary))
+            pbSession.visibility = View.VISIBLE
             pbSession.progress = percent(s.continuousUsedMs, s.sessionLimitMs)
         } else {
             tvSessionRemaining.text = "未启用"
-            tvSessionUsed.text = "本次已连续 ${Formatter.hmsFull(s.continuousUsedMs)}"
-            pbSession.progress = 0
+            tvSessionRemaining.setTextColor(getColor(R.color.text_sub))
+            pbSession.visibility = View.GONE
         }
+        tvSessionUsed.text = "本次已连续 ${Formatter.hmsFull(s.continuousUsedMs)}"
 
-        tvRestCountdown.text = if (s.restRemainingMs > 0L) {
-            "休息中，剩余 ${Formatter.hmsFull(s.restRemainingMs)}"
+        if (s.restRemainingMs > 0L) {
+            tvRestCountdown.text = "休息中，剩余 ${Formatter.hmsFull(s.restRemainingMs)}"
+            tvRestCountdown.setTextColor(getColor(R.color.warning))
         } else {
-            "未在休息"
+            tvRestCountdown.text = "未在休息"
+            tvRestCountdown.setTextColor(getColor(R.color.text_sub))
         }
         tvForeground.text = "当前前台应用：${s.foregroundLabel}" +
                 if (pinPassed) "" else "（家长验证中）"
