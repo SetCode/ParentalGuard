@@ -37,6 +37,7 @@ import com.tensun.parentalguard.data.UsageRepository
 import com.tensun.parentalguard.model.RulesConfig
 import com.tensun.parentalguard.service.GuardStarter
 import com.tensun.parentalguard.update.AppVersion
+import com.tensun.parentalguard.update.ReleaseRepo
 import com.tensun.parentalguard.update.UpdateChecker
 import com.tensun.parentalguard.update.UpdatePrefs
 import com.tensun.parentalguard.update.UpdateResult
@@ -89,6 +90,7 @@ class MainActivity : Activity() {
     private lateinit var tvVersionInfo: TextView
     private lateinit var tvUpdateStatus: TextView
     private lateinit var btnCheckUpdate: Button
+    private lateinit var btnOpenReleases: Button
     private lateinit var tabs: List<TextView>
     private lateinit var pages: List<View>
     private var currentPage = 0
@@ -193,6 +195,7 @@ class MainActivity : Activity() {
         tvVersionInfo = findViewById(R.id.tvVersionInfo)
         tvUpdateStatus = findViewById(R.id.tvUpdateStatus)
         btnCheckUpdate = findViewById(R.id.btnCheckUpdate)
+        btnOpenReleases = findViewById(R.id.btnOpenReleases)
         // 分页标签与页面容器：索引一一对应，切换时只改可见性
         tabs = listOf(
             findViewById(R.id.tabOverview),
@@ -276,6 +279,8 @@ class MainActivity : Activity() {
             }
         }
         btnTtsSettings.setOnClickListener { openSoundSettings() }
+        // 检查失败（如被 GitHub 限流）时家长仍有手动入口
+        btnOpenReleases.setOnClickListener { openUrl(ReleaseRepo.RELEASES_PAGE) }
         btnCheckUpdate.setOnClickListener {
             if (!pinPassed) {
                 Toast.makeText(this, "请先通过家长验证", Toast.LENGTH_SHORT).show()

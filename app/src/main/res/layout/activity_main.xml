@@ -733,14 +733,31 @@
                         android:textColor="@color/text_sub"
                         android:textSize="12sp" />
 
-                    <Button
-                        android:id="@+id/btnCheckUpdate"
-                        android:background="@drawable/bg_btn_primary"
-                        android:textColor="@android:color/white"
+                    <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"
-                        android:text="检查更新" />
+                        android:orientation="horizontal">
+
+                        <Button
+                            android:id="@+id/btnCheckUpdate"
+                            android:background="@drawable/bg_btn_primary"
+                            android:textColor="@android:color/white"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="wrap_content"
+                            android:text="检查更新" />
+
+                        <Button
+                            android:id="@+id/btnOpenReleases"
+                            android:background="@drawable/bg_btn_secondary"
+                            android:textColor="@color/primary"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_marginStart="8dp"
+                            android:layout_height="wrap_content"
+                            android:text="打开发布页" />
+                    </LinearLayout>
 
                     <TextView
                         android:layout_width="match_parent"
