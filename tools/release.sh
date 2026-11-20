@@ -2,8 +2,8 @@
 # 本地发布脚本：改版本号 → 跑单测 → 构建签名 APK → 校验产物 → 打 tag（可选直接发 Release）
 #
 # 用法：
-#   ./tools/release.sh 1.0.1                         仅构建并产出 dist/ 下的安装包
-#   ./tools/release.sh 1.0.1 --push                  构建 + 提交版本号 + 打 tag 并推送（由 CI 发布）
+#   ./tools/release.sh 1.0.1                         仅构建并产出仓库根目录下的安装包
+#   ./tools/release.sh 1.0.1 --push                  构建 + 提交安装包与版本号 + 打 tag 并推送（由 CI 发布）
 #   ./tools/release.sh 1.0.1 --upload                构建 + 用本地产物直接创建/更新 Release
 #   ./tools/release.sh 1.0.1 --notes-file docs/releases/v1.0.1.md --push
 #
@@ -130,7 +130,8 @@ if printf '%s' "$SRC" | grep -q 'unsigned'; then
 fi
 
 mkdir -p dist
-OUT="dist/ParentalGuard-v$VERSION.apk"
+# 产物放在仓库根目录：与既有 ParentalGuard-v1.0.0.apk 的做法一致，CI 也从这里取包发布
+OUT="ParentalGuard-v$VERSION.apk"
 cp "$SRC" "$OUT"
 
 echo "== 校验签名 =="
@@ -177,13 +178,13 @@ printf '%s\n' "$NOTES" > dist/release-notes.md
 
 # ---------------------------------------------------------------- 7. 提交与发布
 if [ "$DO_PUSH" -eq 1 ]; then
-    echo "== 提交版本号并打 tag =="
-    git add version.properties
-    git commit -m "发布 v$VERSION"
+    echo "== 提交版本号与安装包，打 tag =="
+    git add version.properties "$OUT" "$OUT.sha256"
+    git commit -m "发布 v$VERSION：提交签名安装包与校验值"
     git tag -a "v$VERSION" -m "ParentalGuard v$VERSION"
     git push origin HEAD
     git push origin "v$VERSION"
-    echo "已推送 tag v$VERSION，CI 将构建并发布 Release"
+    echo "已推送 tag v$VERSION，CI 将校验产物并创建 Release（无需任何 Secret）"
 fi
 
 if [ "$DO_UPLOAD" -eq 1 ]; then

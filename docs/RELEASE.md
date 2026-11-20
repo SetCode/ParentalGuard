@@ -17,37 +17,34 @@ Git tag 必须是 `v<versionName>`（如 `v1.0.1`），否则应用内比较会�
 ## 二、本地发布
 
 ```bash
-./tools/release.sh 1.0.1                      # 只构建，产物在 dist/
-./tools/release.sh 1.0.1 --push               # 提交版本号 + 打 tag 并推送，由 CI 发布
-./tools/release.sh 1.0.1 --upload             # 用本地产物直接创建/更新 Release
+./tools/release.sh 1.0.1                      # 只构建，产物在仓库根目录
+./tools/release.sh 1.0.1 --push               # 提交安装包与版本号 + 打 tag 并推送，由 CI 发布
+./tools/release.sh 1.0.1 --upload             # 用本地产物直接创建/更新 Release（需 gh 已登录）
 ./tools/release.sh 1.0.1 --notes-file docs/releases/v1.0.1.md --push
 ```
 
 脚本会依次：写版本号 → 跑单元测试 → `assembleRelease` → `apksigner verify` 验签 →
-`aapt2 dump badging` 核对包内版本号 → 输出 `dist/ParentalGuard-v1.0.1.apk` 与 `.sha256`。
+`aapt2 dump badging` 核对包内版本号 → 输出 `ParentalGuard-v1.0.1.apk` 与 `.sha256` 到仓库根目录。
 任何一步不符直接非零退出，不会产出「版本号对不上」的包。
 
 发布说明优先级：`--notes` > `--notes-file` > `docs/releases/v<版本>.md` > 自动取 `git log`。
 
 ## 三、CI 发布（推荐）
 
-`.github/workflows/release.yml`：推送 `v*` tag 或手动触发（输入版本号）时，
-在 GitHub 上构建签名 APK、跑单测、核对包内版本号，然后创建 Release，附件包含
-`ParentalGuard-v<版本>.apk` 与 `.sha256`。若同 tag 的 Release 已存在，则覆盖附件与说明（可重跑）。
+`.github/workflows/release.yml`：推送 `v*` tag 或手动触发（输入版本号）时，CI 只做三件事——
+**校验产物、生成发布说明、创建 Release**，附件为 `ParentalGuard-v<版本>.apk` 与 `.sha256`。
+若同 tag 的 Release 已存在，则覆盖附件与说明（可重跑）。
+
+校验内容：APK 是否存在、`sha256` 与记录值是否一致、`aapt2` 读出的包内 `versionName` 是否等于 tag。
+任一不符直接失败，绝不发出对不上的包。
 
 `.github/workflows/ci.yml`：推送到 `master` 或提 PR 时跑单元测试 + Debug 构建，保证合并前可编译。
 
-### 需要在仓库配置的 Secrets
+### 为什么不需要任何 Secret
 
-密钥自仓库移除后（见 README 安全说明），CI 必须用 Secrets 提供签名材料：
-
-```bash
-# 在项目根目录执行，生成可直接粘贴到 GitHub Secrets 的 base64 内容
-base64 -w0 release.jks            # → Secret 名：KEYSTORE_BASE64
-base64 -w0 keystore.properties    # → Secret 名：KEYSTORE_PROPERTIES_BASE64
-```
-
-未配置时 CI 仍会构建，但产物未签名，只能全新安装、无法覆盖旧版本（工作流会给出 warning）。
+签名在**开发者本机**完成（`tools/release.sh` 用 `release.jks` 签名并验签），私钥既不在仓库里，
+也不经 CI，因此不需要 `KEYSTORE_BASE64` 之类的 Secret——CI 只用 GitHub 自带的 `GITHUB_TOKEN`
+创建 Release。代价是发布包必须在本地构建后提交，这也是仓库里保留历史 APK 的原因。
 
 ## 四、验证发布结果
 
@@ -60,7 +57,7 @@ curl -s https://api.github.com/repos/SetCode/ParentalGuard/releases/latest | gre
 
 # 下载附件并与本地 sha256 比对
 gh release download v1.0.1 -p 'ParentalGuard-v1.0.1.apk' -D /tmp/pg
-sha256sum /tmp/pg/ParentalGuard-v1.0.1.apk dist/ParentalGuard-v1.0.1.apk
+sha256sum /tmp/pg/ParentalGuard-v1.0.1.apk ParentalGuard-v1.0.1.apk
 ```
 
 ## 五、应用内更新检查的判定规则

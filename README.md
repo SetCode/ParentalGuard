@@ -414,14 +414,17 @@ python tools/generate_voice.py
 **发布流程**（详见 `docs/RELEASE.md`）：
 
 ```bash
-./tools/release.sh 1.0.1                 # 本机构建 + 验签 + 核对包内版本号，产物在 dist/
-./tools/release.sh 1.0.1 --push           # 提交版本号、打 tag 并推送，由 CI 构建并发布 Release
-./tools/release.sh 1.0.1 --upload         # 或用本地产物直接创建 / 覆盖 Release
+./tools/release.sh 1.0.1                 # 本机构建 + 验签 + 核对包内版本号，产物落在仓库根目录
+./tools/release.sh 1.0.1 --push           # 提交安装包与版本号、打 tag 并推送，由 CI 发布 Release
+./tools/release.sh 1.0.1 --upload         # 或用本地产物直接创建 / 覆盖 Release（需 gh 已登录）
 ```
 
-`v*` tag 推送后，`.github/workflows/release.yml` 会跑单测、构建签名 APK、用 `aapt2` 核对包内版本号，
-然后创建 Release，附件为 `ParentalGuard-v<版本>.apk` 与其 `.sha256`。签名材料通过 Secrets
-`KEYSTORE_BASE64` / `KEYSTORE_PROPERTIES_BASE64` 注入（密钥已从仓库移除，不随源码分发）。
+`v*` tag 推送后，`.github/workflows/release.yml` 只做「校验产物 → 生成发布说明 → 创建 Release」：
+核对 APK 是否存在、`sha256` 是否一致、`aapt2` 读出的包内 `versionName` 是否等于 tag，任一不符直接失败。
+附件为 `ParentalGuard-v<版本>.apk` 与其 `.sha256`。
+
+**签名只在本机完成，CI 不需要任何 Secret**：私钥既不在仓库里，也不进 Actions，CI 仅用自带的
+`GITHUB_TOKEN` 创建 Release。代价是发布包需本地构建后提交（与仓库保留历史 APK 的做法一致）。
 
 ---
 
