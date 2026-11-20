@@ -18,3 +18,6 @@ captures/
 # Python 语音资源生成脚本缓存
 __pycache__/
 *.pyc
+
+# 本地发布产物（安装包与校验值由发布脚本生成）
+dist/

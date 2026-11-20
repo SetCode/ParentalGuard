@@ -1,0 +1,159 @@
+name: Release
+
+# 打 tag（v1.0.1）即触发：构建签名的 release APK 并发布到 GitHub Releases。
+# 也可在 Actions 页面手动输入版本号重跑（不会覆盖已上传的同名附件，会做覆盖更新）。
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号（不带 v 前缀，例如 1.0.1）'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码（含全部 tag，用于生成变更清单）
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 安装 JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: 配置 Gradle 缓存
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: 解析版本号与 versionCode
+        id: ver
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          # 版本号必须是 1.2.3 之类的纯数字段形式，避免发布出无法比较的 tag
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+(\.[0-9]+){1,3}$'; then
+            echo "::error::版本号格式非法：'$VERSION'，应形如 1.0.1"
+            exit 1
+          fi
+          CODE=$(printf '%s' "$VERSION" | awk -F. '{printf "%d", $1*10000 + ($2+0)*100 + ($3+0)}')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          echo "版本 $VERSION → versionCode $CODE"
+
+      - name: 恢复发布签名
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PROPERTIES_BASE64: ${{ secrets.KEYSTORE_PROPERTIES_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KEYSTORE_BASE64}" ] || [ -z "${KEYSTORE_PROPERTIES_BASE64}" ]; then
+            echo "::warning::未配置 KEYSTORE_BASE64 / KEYSTORE_PROPERTIES_BASE64，产物将为未签名 APK，无法覆盖安装旧版本"
+            exit 0
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > release.jks
+          echo "$KEYSTORE_PROPERTIES_BASE64" | base64 -d > keystore.properties
+          echo "签名配置已就绪"
+
+      - name: 运行单元测试
+        run: ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace
+
+      - name: 构建 Release APK
+        run: |
+          set -euo pipefail
+          ./gradlew :app:assembleRelease --no-daemon --stacktrace \
+            -PversionName=${{ steps.ver.outputs.version }} \
+            -PversionCode=${{ steps.ver.outputs.code }}
+
+      - name: 收集安装包并生成校验值
+        id: apk
+        run: |
+          set -euo pipefail
+          SRC=$(find app/build/outputs/apk/release -maxdepth 1 -name "*.apk" | head -n1)
+          if [ -z "$SRC" ]; then
+            echo "::error::未找到构建产物，请检查 assembleRelease 任务输出"
+            exit 1
+          fi
+          OUT="ParentalGuard-v${{ steps.ver.outputs.version }}.apk"
+          cp "$SRC" "$OUT"
+          sha256sum "$OUT" | tee "$OUT.sha256"
+          # 核对包内版本号，防止 CI 传参未生效却照常发布
+          AAPT2=$(find "$ANDROID_HOME/build-tools" -name aapt2 | sort -r | head -n1)
+          if [ -n "$AAPT2" ]; then
+            "$AAPT2" dump badging "$OUT" | grep -E "^package:" || true
+          fi
+          echo "path=$OUT" >> "$GITHUB_OUTPUT"
+          echo "sha=$OUT.sha256" >> "$GITHUB_OUTPUT"
+
+      - name: 生成发布说明
+        run: |
+          set -euo pipefail
+          V="${{ steps.ver.outputs.version }}"
+          FILE="docs/releases/v$V.md"
+          if [ -f "$FILE" ]; then
+            cp "$FILE" release-notes.md
+            echo "使用手写发布说明 $FILE"
+            exit 0
+          fi
+          PREV=$(git tag --sort=-v:refname | grep -vx "v$V" | head -n1 || true)
+          {
+            echo "## 儿童设备管控 v$V"
+            echo
+            if [ -n "$PREV" ]; then
+              echo "**变更内容（自 $PREV）**"
+              echo
+              git log --no-merges --pretty=format:"- %s" "$PREV..HEAD"
+            else
+              echo "**变更内容**"
+              echo
+              git log --no-merges --pretty=format:"- %s"
+            fi
+            echo
+            echo
+            echo "下载 \`ParentalGuard-v$V.apk\` 覆盖安装即可，本机已有规则与计时数据不受影响。"
+            echo
+            echo "校验：\`sha256sum ParentalGuard-v$V.apk\` 应与附件 \`.sha256\` 一致。"
+          } > release-notes.md
+          cat release-notes.md
+
+      - name: 发布到 GitHub Releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          V="${{ steps.ver.outputs.version }}"
+          TAG="v$V"
+          APK="${{ steps.apk.outputs.path }}"
+          SHA="${{ steps.apk.outputs.sha }}"
+          # 手动触发时本地可能还没有该 tag，先补建并推送
+          if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+            git tag -a "$TAG" -m "ParentalGuard $TAG"
+            git push origin "$TAG"
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG 已存在，改为覆盖附件与说明"
+            gh release upload "$TAG" "$APK" "$SHA" --clobber
+            gh release edit "$TAG" --title "ParentalGuard $TAG" --notes-file release-notes.md
+          else
+            gh release create "$TAG" "$APK" "$SHA" \
+              --title "ParentalGuard $TAG" \
+              --notes-file release-notes.md \
+              --latest
+          fi
+          gh release view "$TAG" --json tagName,name,assets,url

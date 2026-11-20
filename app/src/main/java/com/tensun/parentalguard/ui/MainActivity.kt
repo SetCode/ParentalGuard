@@ -36,12 +36,22 @@ import com.tensun.parentalguard.data.ConfigRepository
 import com.tensun.parentalguard.data.UsageRepository
 import com.tensun.parentalguard.model.RulesConfig
 import com.tensun.parentalguard.service.GuardStarter
+import com.tensun.parentalguard.update.AppVersion
+import com.tensun.parentalguard.update.UpdateChecker
+import com.tensun.parentalguard.update.UpdatePrefs
+import com.tensun.parentalguard.update.UpdateResult
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
-/** @brief 家长主界面：实时状态、权限引导、全部规则开关与儿童提示方式设置 */
+/** @brief 家长主界面：实时状态、权限引导、全部规则开关、儿童提示方式与版本更新检查 */
 class MainActivity : Activity() {
 
     companion object {
         private const val REQ_NOTIFICATION = 2001
+
+        /** @brief 启动时自动检查更新的最小间隔，避免每次冷启动都访问 GitHub */
+        private const val AUTO_CHECK_INTERVAL_MS = 12L * 60 * 60 * 1000
     }
 
     private lateinit var cfg: RulesConfig
@@ -71,11 +81,15 @@ class MainActivity : Activity() {
     private lateinit var btnTestVoice: Button
     private lateinit var btnTtsSettings: Button
     private lateinit var tvVoiceEngine: TextView
+    private lateinit var tvVersionInfo: TextView
+    private lateinit var tvUpdateStatus: TextView
+    private lateinit var btnCheckUpdate: Button
 
     private val handler = Handler(Looper.getMainLooper())
     private var refreshing = false
     private var updatingUi = false
     private var pinPassed = true
+    private var checkingUpdate = false
 
     private data class RuleCardRef(
         val sw: Switch,
@@ -115,7 +129,10 @@ class MainActivity : Activity() {
         renderConfig()
         renderStatus()
         renderPermissions()
+        renderVersionInfo()
         askPinIfNeeded()
+        // 自动检查放在密码门之后：有密码时由验证成功回调触发，避免提示框压在验证框上
+        maybeAutoUpdateCheck()
     }
 
     override fun onResume() {
@@ -163,6 +180,9 @@ class MainActivity : Activity() {
         btnTestVoice = findViewById(R.id.btnTestVoice)
         btnTtsSettings = findViewById(R.id.btnTtsSettings)
         tvVoiceEngine = findViewById(R.id.tvVoiceEngine)
+        tvVersionInfo = findViewById(R.id.tvVersionInfo)
+        tvUpdateStatus = findViewById(R.id.tvUpdateStatus)
+        btnCheckUpdate = findViewById(R.id.btnCheckUpdate)
     }
 
     private fun setupListeners() {
@@ -214,6 +234,13 @@ class MainActivity : Activity() {
             }
         }
         btnTtsSettings.setOnClickListener { openSoundSettings() }
+        btnCheckUpdate.setOnClickListener {
+            if (!pinPassed) {
+                Toast.makeText(this, "请先通过家长验证", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            runUpdateCheck(manual = true)
+        }
     }
 
     /** @brief 打开系统声音设置，便于家长调高媒体音量 */
@@ -549,6 +576,7 @@ class MainActivity : Activity() {
                 if (edit.text.toString() == cfg.parentPin) {
                     pinPassed = true
                     dlg.dismiss()
+                    maybeAutoUpdateCheck()
                 } else {
                     edit.text.clear()
                     edit.error = "密码不正确"
@@ -564,6 +592,121 @@ class MainActivity : Activity() {
             }
         }
         dlg.show()
+    }
+
+    // ---------------------------------------------------------------- 版本与更新
+
+    /** @brief 展示本机版本号与上次检查时间，未检查过时给出明确文案 */
+    private fun renderVersionInfo() {
+        tvVersionInfo.text = "当前版本 ${AppVersion.current(this)}（build ${AppVersion.currentCode(this)}）"
+        val last = UpdatePrefs.lastCheckMs(this)
+        tvUpdateStatus.text = if (last <= 0L) {
+            "尚未检查更新"
+        } else {
+            "上次检查：${SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(Date(last))}"
+        }
+        tvUpdateStatus.setTextColor(getColor(R.color.text_sub))
+    }
+
+    /** @brief 启动时自动检查：受 12 小时间隔与家长密码限制，失败不打扰家长 */
+    private fun maybeAutoUpdateCheck() {
+        if (!pinPassed || checkingUpdate) return
+        val now = System.currentTimeMillis()
+        if (now - UpdatePrefs.lastCheckMs(this) < AUTO_CHECK_INTERVAL_MS) return
+        runUpdateCheck(manual = false)
+    }
+
+    /** @brief 执行检查；结果回到主线程后按四类情况分别渲染 */
+    private fun runUpdateCheck(manual: Boolean) {
+        if (checkingUpdate) {
+            if (manual) Toast.makeText(this, "正在检查，请稍候", Toast.LENGTH_SHORT).show()
+            return
+        }
+        checkingUpdate = true
+        btnCheckUpdate.isEnabled = false
+        btnCheckUpdate.text = "检查中…"
+        if (manual) {
+            tvUpdateStatus.text = "正在连接 GitHub…"
+            tvUpdateStatus.setTextColor(getColor(R.color.text_sub))
+        }
+        UpdateChecker.checkAsync(this) { result ->
+            checkingUpdate = false
+            if (isFinishing || isDestroyed) return@checkAsync
+            btnCheckUpdate.isEnabled = true
+            btnCheckUpdate.text = "检查更新"
+            UpdatePrefs.markChecked(this, System.currentTimeMillis())
+            renderUpdateResult(result, manual)
+        }
+    }
+
+    /** @brief 按结果类型渲染状态行；手动触发时额外用 Toast 明确告知，自动检查静默处理失败 */
+    private fun renderUpdateResult(result: UpdateResult, manual: Boolean) {
+        when (result) {
+            is UpdateResult.Available -> {
+                tvUpdateStatus.text = "发现新版本 v${result.info.version}（当前 ${result.current}）"
+                tvUpdateStatus.setTextColor(getColor(R.color.danger))
+                showUpdateDialog(result)
+            }
+            is UpdateResult.Latest -> {
+                tvUpdateStatus.text = "已是最新版本 v${result.latest}"
+                tvUpdateStatus.setTextColor(getColor(R.color.success))
+                if (manual) {
+                    Toast.makeText(this, "当前已是最新版本 v${result.latest}", Toast.LENGTH_SHORT).show()
+                }
+            }
+            is UpdateResult.NoRelease -> {
+                tvUpdateStatus.text = "GitHub 上还没有正式发布版本（当前 ${result.current}）"
+                tvUpdateStatus.setTextColor(getColor(R.color.warning))
+                if (manual) {
+                    Toast.makeText(this, "仓库尚未发布任何版本，暂无更新可装", Toast.LENGTH_LONG).show()
+                }
+            }
+            is UpdateResult.NetworkError -> {
+                tvUpdateStatus.text = "检查失败：${result.detail}"
+                tvUpdateStatus.setTextColor(getColor(R.color.danger))
+                if (manual) {
+                    Toast.makeText(this, "检查失败：${result.detail}", Toast.LENGTH_LONG).show()
+                }
+            }
+            is UpdateResult.FormatError -> {
+                tvUpdateStatus.text = "版本信息异常：${result.detail}"
+                tvUpdateStatus.setTextColor(getColor(R.color.warning))
+                if (manual) {
+                    Toast.makeText(this, "版本信息异常：${result.detail}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    /** @brief 新版本提示：列出当前/最新版本与发布说明，提供安装包下载与发布页两个入口 */
+    private fun showUpdateDialog(result: UpdateResult.Available) {
+        val info = result.info
+        val message = buildString {
+            append("当前版本：").append(result.current).append('\n')
+            append("最新版本：v").append(info.version)
+            if (info.publishedAt.isNotEmpty()) {
+                append('\n').append("发布时间：").append(info.publishedAt.replace('T', ' ').removeSuffix("Z"))
+            }
+            append("\n\n")
+            append(info.notes.ifEmpty { "本次发布未填写说明，可打开发布页查看详情。" })
+            append("\n\n覆盖安装不会影响本机已有的规则与计时配置。")
+        }
+        AlertDialog.Builder(this)
+            .setTitle("发现新版本 v${info.version}")
+            .setMessage(message)
+            .setNegativeButton("稍后", null)
+            .setNeutralButton("发布页") { _, _ -> openUrl(info.pageUrl) }
+            .setPositiveButton("下载安装包") { _, _ -> openUrl(info.apkUrl) }
+            .show()
+    }
+
+    /** @brief 交给系统浏览器 / 下载器打开链接，无可用应用时提示手动访问 */
+    private fun openUrl(url: String) {
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        } catch (e: Exception) {
+            Toast.makeText(this, "无法打开浏览器，请手动访问：\n$url", Toast.LENGTH_LONG).show()
+        }
     }
 
     // ---------------------------------------------------------------- 状态渲染

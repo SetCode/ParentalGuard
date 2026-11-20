@@ -42,6 +42,10 @@ ParentalGuard/
 ├── tools/generate_voice.py               # 重新生成语音资源的脚本（可选）
 ├── tools/verify_timing.py                # 计时 / 共享合并 / 秒级格式 / 仅本机字段 /
 │                                              # 时间重置的性质自检（47 项）
+├── tools/release.sh                      # 本地发布：构建 → 验签 → 核对版本 → 打 tag / 发 Release
+├── version.properties                    # 版本号唯一来源（versionName / versionCode）
+├── .github/workflows/                    # CI（单测 + Debug 构建）与 Release（tag 触发发布）
+├── docs/RELEASE.md                       # 版本号规则、CI Secrets、发布验证命令
 ├── ParentalGuard-v1.0.0.apk               ← 已签名发布版 APK（推荐安装）
 ├── ParentalGuard-v1.0.0-debug.apk          ← 调试版 APK
 └── README.md
@@ -49,7 +53,7 @@ ParentalGuard/
 
 > 两个 APK 均由本次交付在本机实际编译产出，可直接 `adb install`；发布版使用随工程提供的演示密钥签名。
 
-技术选型：**Kotlin + Android Framework 原生 API，零第三方依赖**（无 AndroidX、无 Room、无协程库、无 TTS 依赖；语音为 `res/raw` 内置 mp3 由 `MediaPlayer` 播放；局域网服务用 `java.net.ServerSocket` 手写极简 HTTP/1.1 + UDP 广播发现），降低构建与兼容风险。
+技术选型：**Kotlin + Android Framework 原生 API，零第三方运行依赖**（无 AndroidX、无 Room、无协程库、无 TTS 依赖；语音为 `res/raw` 内置 mp3 由 `MediaPlayer` 播放；局域网服务用 `java.net.ServerSocket` 手写极简 HTTP/1.1 + UDP 广播发现；更新检查用 `HttpURLConnection` + `org.json` 直连 GitHub API）。仅单元测试引入 JUnit，不进入安装包。
 
 | 项 | 值 |
 | --- | --- |
@@ -390,7 +394,38 @@ python tools/generate_voice.py
 
 ---
 
-## 九、已知限制
+## 九、版本更新检查与发布
+
+主界面底部新增「版本与更新」卡片，读取本机 `versionName` 与 GitHub Releases 的最新 tag 比较：
+
+| 情况 | 判定 | 界面表现 |
+| --- | --- | --- |
+| 远端版本更高 | 有更新 | 弹窗列出当前 / 最新版本、发布时间与发布说明，提供「下载安装包」与「发布页」两个入口 |
+| 远端版本相等或更低 | 已是最新 | 绿色状态行；手动检查时追加 Toast |
+| API 返回 404 | 仓库尚无正式发布 | 黄色提示，不按失败处理 |
+| 超时 / 无网络 / 非 2xx | 网络失败 | 红色显示具体原因；启动时的自动检查失败不弹窗打扰 |
+| tag 或本机版本号无法解析 | 格式异常 | 黄色提示指明是哪个版本号不合法，不做错误比较 |
+
+- 触发方式：**启动时自动检查**（受 12 小时间隔限制，`UpdatePrefs` 记录上次时间）+ 卡片上的**「检查更新」按钮**（需先通过家长密码）。
+- 只访问 `api.github.com` 读取版本号与发布说明，**不上传任何本机数据**；版本比较只取数字段，`v` 前缀与 `-beta` 之类后缀会被忽略。
+- 下载走系统浏览器 / 下载器打开 Release 附件地址，覆盖安装不会影响本机已有的规则与计时配置。
+- 版本比较逻辑有单元测试覆盖（`app/src/test/java/.../VersionCompareTest.kt`，含缺段、前缀、预发布后缀与格式异常）。
+
+**发布流程**（详见 `docs/RELEASE.md`）：
+
+```bash
+./tools/release.sh 1.0.1                 # 本机构建 + 验签 + 核对包内版本号，产物在 dist/
+./tools/release.sh 1.0.1 --push           # 提交版本号、打 tag 并推送，由 CI 构建并发布 Release
+./tools/release.sh 1.0.1 --upload         # 或用本地产物直接创建 / 覆盖 Release
+```
+
+`v*` tag 推送后，`.github/workflows/release.yml` 会跑单测、构建签名 APK、用 `aapt2` 核对包内版本号，
+然后创建 Release，附件为 `ParentalGuard-v<版本>.apk` 与其 `.sha256`。签名材料通过 Secrets
+`KEYSTORE_BASE64` / `KEYSTORE_PROPERTIES_BASE64` 注入（密钥已从仓库移除，不随源码分发）。
+
+---
+
+## 十、已知限制
 
 - 本应用使用「无障碍服务 + 悬浮窗 + 使用情况访问」实现**普通应用级**管控，未使用 Device Owner / Device Policy Manager（后者需要设备管理器 provisioning，普通安装无法获得）。因此：手势导航的系统级操作、通知栏快捷设置、部分厂商分屏/小窗无法 100% 拦截；儿童仍可能通过系统设置强行关闭无障碍服务，建议配合系统「屏幕固定」或设备自带家长控制使用。
 - 部分国产 ROM 会主动冻结后台服务，需加入电池优化白名单 / 自启动白名单 / 后台锁定。
@@ -410,3 +445,5 @@ python tools/generate_voice.py
 - 时间重置依赖共享数据集里的 `epoch` 重置纪元字段：旧版本客户端的数据集不含该字段，与新版混用时其上报的旧数据会被当作初始纪元，无法保证「重置后旧值不复活」。**执行时间重置前请让局域网内所有设备升级到本次版本**；本机未启用共享时不受此限制。
 - 部分厂商会把前台服务的常驻通知归入「静默通知」分组或默认折叠，需在该通知上再下拉一次（或在系统通知设置里把「管控状态」渠道设为默认 / 提示）。折叠状态本身已同时显示两项秒级数值，主界面始终不受影响。
 - Android 与部分 ROM 可能对高频通知刷新做合并限流，通知上的秒数偶尔会一次跳 2 秒；主界面的秒级显示与计时判定始终按 1Hz 精确执行，不受影响。
+- 更新检查依赖 `api.github.com` 可达：网络受限时会显示「检查失败：连接 GitHub 超时」，不影响管控功能；Release 附件直链下载同样需要能访问 GitHub，受限环境请手动拷贝 APK 安装。未登录的匿名调用受 GitHub 每小时 60 次限流，本应用有 12 小时间隔限制，正常使用不会触发。
+- 更新检查不校验安装包签名，只做版本号比较；请只安装本仓库 Releases 中的附件（可用附带的 `.sha256` 自行校验）。
