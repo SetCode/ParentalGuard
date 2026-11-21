@@ -1,7 +1,7 @@
 name: Release
 
 # 发布流程不需要任何 Secret：
-#   1. 本地 tools/release.sh 构建并签名 APK，产物提交到仓库根目录（ParentalGuard-v<版本>.apk + .sha256）
+#   1. 本地 tools/release.sh 构建并签名 APK，产物提交到仓库 Release/ 目录（ParentalGuard-v<版本>.apk + .sha256）
 #   2. 打 tag v<版本> 并推送
 #   3. 本工作流校验产物、生成发布说明，用自带的 GITHUB_TOKEN 创建 Release
 # 私钥只在开发者本机，永不进入 CI，也不进仓库。
@@ -53,10 +53,10 @@ jobs:
         run: |
           set -euo pipefail
           V="${{ steps.ver.outputs.version }}"
-          APK="ParentalGuard-v$V.apk"
+          APK="Release/ParentalGuard-v$V.apk"
           SHA="$APK.sha256"
           if [ ! -f "$APK" ]; then
-            echo "::error::仓库根目录缺少 $APK"
+            echo "::error::Release/ 目录缺少 $APK"
             echo "请先在本地执行 ./tools/release.sh $V --push 构建并提交产物"
             exit 1
           fi

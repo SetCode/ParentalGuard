@@ -45,13 +45,15 @@ ParentalGuard/
 ├── tools/release.sh                      # 本地发布：构建 → 验签 → 核对版本 → 打 tag / 发 Release
 ├── version.properties                    # 版本号唯一来源（versionName / versionCode）
 ├── .github/workflows/                    # CI（单测 + Debug 构建）与 Release（tag 触发发布）
-├── docs/RELEASE.md                       # 版本号规则、CI Secrets、发布验证命令
-├── ParentalGuard-v1.0.0.apk               ← 已签名发布版 APK（推荐安装）
-├── ParentalGuard-v1.0.0-debug.apk          ← 调试版 APK
+├── docs/RELEASE.md                       # 版本号规则、发布流程与验证命令
+├── Release/                              ← 各版本安装包与 sha256（见下）
+│   ├── ParentalGuard-v1.0.0.apk          已签名发布版（推荐安装）
+│   ├── ParentalGuard-v1.0.0-debug.apk    调试版
+│   └── ParentalGuard-v1.1.2.apk          当前最新发布版
 └── README.md
 ```
 
-> 两个 APK 均由本次交付在本机实际编译产出，可直接 `adb install`；发布版使用随工程提供的演示密钥签名。
+> `Release/` 下的 APK 均在本机实际编译产出，可直接 `adb install` 或 `adb install -r Release/ParentalGuard-v1.1.2.apk` 覆盖升级；发布版使用随工程提供的演示密钥签名，`sha256` 与同名文件对应。
 
 技术选型：**Kotlin + Android Framework 原生 API，零第三方运行依赖**（无 AndroidX、无 Room、无协程库、无 TTS 依赖；语音为 `res/raw` 内置 mp3 由 `MediaPlayer` 播放；局域网服务用 `java.net.ServerSocket` 手写极简 HTTP/1.1 + UDP 广播发现；更新检查用 `HttpURLConnection` + `org.json` 直连 GitHub API）。仅单元测试引入 JUnit，不进入安装包。
 
@@ -332,7 +334,7 @@ export ANDROID_HOME=/path/to/android-sdk
 ./gradlew assembleDebug        # 调试版
 ./gradlew assembleRelease     # 已签名发布版
 # 产物：app/build/outputs/apk/{debug,release}/...
-adb install -r ParentalGuard-v1.0.0.apk
+adb install -r Release/ParentalGuard-v1.0.0.apk
 ```
 
 ### 计时与共享算法自检（可选）
@@ -359,7 +361,7 @@ python tools/generate_voice.py
 
 - 换机器后请删除 `local.properties`（若存在），让 Android Studio 自动生成，或改用 `ANDROID_HOME` 环境变量。
 - 工程根目录的 `release.jks` + `keystore.properties` 是**演示用发布签名密钥**（口令 `parentalguard2026`，别名 `parentalguard`），`assembleRelease` 会自动读取并签名。正式分发时请替换为自有密钥并妥善保管，不要提交到公开仓库。
-- 交付目录中的 `ParentalGuard-v1.0.0.apk` 已通过 `apksigner verify`（v2 签名）。
+- `Release/` 下的各版本 APK 均已通过 `apksigner verify`（v2 签名），同名 `.sha256` 为对应校验值。
 - 国内网络若 Gradle 发行包下载缓慢，可把 `gradle/wrapper/gradle-wrapper.properties` 的 `distributionUrl` 改为 `https://mirrors.huaweicloud.com/gradle/gradle-8.2-bin.zip`。
 
 ---
@@ -425,7 +427,7 @@ python tools/generate_voice.py
 **发布流程**（详见 `docs/RELEASE.md`）：
 
 ```bash
-./tools/release.sh 1.0.1                 # 本机构建 + 验签 + 核对包内版本号，产物落在仓库根目录
+./tools/release.sh 1.0.1                 # 本机构建 + 验签 + 核对包内版本号，产物落在 Release/ 目录
 ./tools/release.sh 1.0.1 --push           # 提交安装包与版本号、打 tag 并推送，由 CI 发布 Release
 ./tools/release.sh 1.0.1 --upload         # 或用本地产物直接创建 / 覆盖 Release（需 gh 已登录）
 ```

@@ -149,9 +149,9 @@ if printf '%s' "$SRC" | grep -q 'unsigned'; then
     echo "警告：产物未签名（缺少 release.jks / keystore.properties），无法覆盖安装旧版本" >&2
 fi
 
-mkdir -p dist
-# 产物放在仓库根目录：与既有 ParentalGuard-v1.0.0.apk 的做法一致，CI 也从这里取包发布
-OUT="ParentalGuard-v$VERSION.apk"
+mkdir -p dist Release
+# 产物统一放 Release/ 目录，CI 从这里取包发布
+OUT="Release/ParentalGuard-v$VERSION.apk"
 cp "$SRC" "$OUT"
 
 echo "== 校验签名 =="
@@ -175,7 +175,8 @@ else
     echo "未找到 aapt2，跳过包内版本校验"
 fi
 
-sha256sum "$OUT" | tee "$OUT.sha256"
+# 校验文件只记录文件名、不带目录前缀，避免移动目录后对不上
+( cd Release && sha256sum "ParentalGuard-v$VERSION.apk" | tee "ParentalGuard-v$VERSION.apk.sha256" )
 ls -lh "$OUT"
 
 # ---------------------------------------------------------------- 6. 发布说明

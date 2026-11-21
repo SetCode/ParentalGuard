@@ -17,14 +17,14 @@ Git tag 必须是 `v<versionName>`（如 `v1.0.1`），否则应用内比较会�
 ## 二、本地发布
 
 ```bash
-./tools/release.sh 1.0.1                      # 只构建，产物在仓库根目录
+./tools/release.sh 1.0.1                      # 只构建，产物在 Release/ 目录
 ./tools/release.sh 1.0.1 --push               # 提交安装包与版本号 + 打 tag 并推送，由 CI 发布
 ./tools/release.sh 1.0.1 --upload             # 用本地产物直接创建/更新 Release（需 gh 已登录）
 ./tools/release.sh 1.0.1 --notes-file docs/releases/v1.0.1.md --push
 ```
 
 脚本会依次：写版本号 → 跑单元测试 → `assembleRelease` → `apksigner verify` 验签 →
-`aapt2 dump badging` 核对包内版本号 → 输出 `ParentalGuard-v1.0.1.apk` 与 `.sha256` 到仓库根目录。
+`aapt2 dump badging` 核对包内版本号 → 输出 `Release/ParentalGuard-v1.0.1.apk` 与同名 `.sha256`。
 任何一步不符直接非零退出，不会产出「版本号对不上」的包。
 
 发布说明优先级：`--notes` > `--notes-file` > `docs/releases/v<版本>.md` > 自动取 `git log`。
@@ -57,7 +57,7 @@ curl -s https://api.github.com/repos/SetCode/ParentalGuard/releases/latest | gre
 
 # 下载附件并与本地 sha256 比对
 gh release download v1.0.1 -p 'ParentalGuard-v1.0.1.apk' -D /tmp/pg
-sha256sum /tmp/pg/ParentalGuard-v1.0.1.apk ParentalGuard-v1.0.1.apk
+sha256sum /tmp/pg/ParentalGuard-v1.0.1.apk Release/ParentalGuard-v1.0.1.apk
 ```
 
 ## 五、应用内更新检查的判定规则
