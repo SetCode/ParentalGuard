@@ -16,7 +16,7 @@
         android:layout_marginStart="16dp"
         android:layout_marginTop="12dp"
         android:layout_marginEnd="16dp"
-        android:text="儿童设备管控"
+        android:text="设备管控"
         android:textColor="@color/text_main"
         android:textSize="20sp"
         android:textStyle="bold" />
@@ -698,6 +698,49 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
                         android:text="重新检测权限" />
+                </LinearLayout>
+
+                <!-- 开机自启动 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"
+                    android:background="@drawable/bg_card"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="开机自启动"
+                        android:textColor="@color/text_main"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvAutoStartStatus"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="上次开机自启动：尚未记录"
+                        android:textColor="@color/text_main"
+                        android:textSize="14sp" />
+
+                    <Button
+                        android:id="@+id/btnAutoStart"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:background="@drawable/bg_btn_secondary"
+                        android:textColor="@color/primary"
+                        android:text="去开启自启动 / 后台运行" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="Android 没有统一的自启动权限，各家在「自启动管理 / 后台运行」里单独控制。本应用已声明开机接收器，只要在厂商列表里允许自启动并放开电池限制，开机后即会在后台恢复管控；上面的时间可用于验证是否真的生效。"
+                        android:textColor="@color/text_sub"
+                        android:textSize="11sp" />
                 </LinearLayout>
 
                 <!-- 版本与更新 -->

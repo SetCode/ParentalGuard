@@ -64,6 +64,11 @@
             android:label="@string/title_app_limit" />
 
         <activity
+            android:name=".ui.TimeWindowActivity"
+            android:exported="false"
+            android:label="时间段管控" />
+
+        <activity
             android:name=".ui.ShareActivity"
             android:exported="false"
             android:label="局域网本地共享" />

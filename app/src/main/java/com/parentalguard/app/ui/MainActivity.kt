@@ -27,6 +27,8 @@ import com.parentalguard.app.core.ForegroundTracker
 import com.parentalguard.app.core.KidPrompt
 import com.parentalguard.app.core.Permissions
 import com.parentalguard.app.core.RuleEngine
+import com.parentalguard.app.core.AutoStart
+import com.parentalguard.app.core.TimeWindow
 import com.parentalguard.app.core.StateBus
 import com.parentalguard.app.core.TimeReset
 import com.parentalguard.app.core.UiStatus
@@ -90,6 +92,8 @@ class MainActivity : Activity() {
     private lateinit var tvVersionInfo: TextView
     private lateinit var tvUpdateStatus: TextView
     private lateinit var btnCheckUpdate: Button
+    private lateinit var tvAutoStartStatus: TextView
+    private lateinit var btnAutoStart: Button
     private lateinit var btnOpenReleases: Button
     private lateinit var tabs: List<TextView>
     private lateinit var pages: List<View>
@@ -153,6 +157,7 @@ class MainActivity : Activity() {
         renderConfig()
         renderStatus()
         renderPermissions()
+        renderAutoStart()
         refreshing = true
         handler.removeCallbacks(refreshRunnable)
         handler.post(refreshRunnable)
@@ -195,6 +200,8 @@ class MainActivity : Activity() {
         tvVersionInfo = findViewById(R.id.tvVersionInfo)
         tvUpdateStatus = findViewById(R.id.tvUpdateStatus)
         btnCheckUpdate = findViewById(R.id.btnCheckUpdate)
+        tvAutoStartStatus = findViewById(R.id.tvAutoStartStatus)
+        btnAutoStart = findViewById(R.id.btnAutoStart)
         btnOpenReleases = findViewById(R.id.btnOpenReleases)
         // 分页标签与页面容器：索引一一对应，切换时只改可见性
         tabs = listOf(
@@ -281,6 +288,11 @@ class MainActivity : Activity() {
         btnTtsSettings.setOnClickListener { openSoundSettings() }
         // 检查失败（如被 GitHub 限流）时家长仍有手动入口
         btnOpenReleases.setOnClickListener { openUrl(ReleaseRepo.RELEASES_PAGE) }
+        btnAutoStart.setOnClickListener {
+            if (!AutoStart.openSettings(this)) {
+                Toast.makeText(this, "本机没有直达入口，请到「设置 → 应用 → 自启动管理」手动允许", Toast.LENGTH_LONG).show()
+            }
+        }
         btnCheckUpdate.setOnClickListener {
             if (!pinPassed) {
                 Toast.makeText(this, "请先通过家长验证", Toast.LENGTH_SHORT).show()
@@ -412,6 +424,26 @@ class MainActivity : Activity() {
             },
             onToggle = { v -> ConfigRepository.update(this) { it.session.enabled = v } },
             onAction = { showSessionDialog() }
+        )
+
+        addRuleCard(
+            title = "时间段管控（禁止使用时段）",
+            actionLabel = "管理时段",
+            enabledOf = { it.timeWindow.enabled },
+            summaryOf = { c ->
+                val slots = c.timeWindow.slots
+                when {
+                    slots.isEmpty() -> "未设置时段：可添加「每天 21:00–07:00」这类禁止使用的时间段"
+                    !c.timeWindow.enabled -> "已设置 ${slots.size} 个时段，当前未启用（规则不生效）"
+                    else -> {
+                        val head = "已启用 ${slots.size} 个时段：" +
+                                slots.take(2).joinToString("；") { TimeWindow.slotLabel(it) }
+                        if (slots.size > 2) "$head 等" else head
+                    }
+                }
+            },
+            onToggle = { v -> ConfigRepository.update(this) { it.timeWindow.enabled = v } },
+            onAction = { startActivity(Intent(this, TimeWindowActivity::class.java)) }
         )
 
         addRuleCard(
@@ -649,6 +681,19 @@ class MainActivity : Activity() {
     // ---------------------------------------------------------------- 版本与更新
 
     /** @brief 展示本机版本号与上次检查时间，未检查过时给出明确文案 */
+    /** @brief 展示上次开机自启动时间，让家长能确认自启动确实生效 */
+    private fun renderAutoStart() {
+        val last = AutoStart.lastBootAt(this)
+        val source = AutoStart.lastBootSource(this)
+        tvAutoStartStatus.text = if (last <= 0L) {
+            "上次开机自启动：尚未记录（开机一次后回来查看）"
+        } else {
+            val fmt = java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.CHINA)
+            val src = if (source.isEmpty()) "" else "（$source）"
+            "上次自启动：${fmt.format(java.util.Date(last))}$src"
+        }
+    }
+
     private fun renderVersionInfo() {
         tvVersionInfo.text = "当前版本 ${AppVersion.current(this)}（build ${AppVersion.currentCode(this)}）"
         val last = UpdatePrefs.lastCheckMs(this)

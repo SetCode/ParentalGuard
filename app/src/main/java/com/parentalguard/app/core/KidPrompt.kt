@@ -15,7 +15,7 @@ import com.parentalguard.app.model.RulesConfig
 object KidPrompt {
 
     enum class Event {
-        BLOCK_WHITELIST, BLOCK_APP_LIMIT,
+        BLOCK_WHITELIST, BLOCK_APP_LIMIT, TIME_WINDOW,
         REST_START, RESTING, REST_END, DAILY_TOTAL, WARNING, TEST
     }
 
@@ -72,6 +72,11 @@ object KidPrompt {
             "可以玩啦", R.drawable.kid_ok, GREEN,
             "休息好啦，可以再玩一会儿", R.raw.voice_rest_end,
             SoundAlert.Kind.REST_END, true
+        )
+        Event.TIME_WINDOW -> Cue(
+            "现在不能用", R.drawable.kid_clock, PURPLE,
+            "现在是禁止使用的时间段，到点就自动恢复啦", R.raw.voice_resting,
+            SoundAlert.Kind.LOCKED, false
         )
         Event.DAILY_TOTAL -> Cue(
             "今天用完啦", R.drawable.kid_clock, PURPLE,

@@ -119,7 +119,7 @@ class GuardService : Service() {
     override fun onCreate() {
         super.onCreate()
         createChannel()
-        startForeground(NOTIF_ID, buildNotification("儿童设备管控", "管控服务启动中…"))
+        startForeground(NOTIF_ID, buildNotification("设备管控", "管控服务启动中…"))
         overlay = LockOverlay(this)
 
         val filter = IntentFilter().apply {
@@ -285,6 +285,7 @@ class GuardService : Service() {
     private fun lockEvent(kind: LockKind): KidPrompt.Event = when (kind) {
         LockKind.DAILY_TOTAL -> KidPrompt.Event.DAILY_TOTAL
         LockKind.REST -> KidPrompt.Event.RESTING
+        LockKind.TIME_WINDOW -> KidPrompt.Event.TIME_WINDOW
         LockKind.WHITELIST -> KidPrompt.Event.BLOCK_WHITELIST
         LockKind.APP_LIMIT -> KidPrompt.Event.BLOCK_APP_LIMIT
         else -> KidPrompt.Event.WARNING
@@ -453,7 +454,7 @@ class GuardService : Service() {
         if (bigText.isNotEmpty()) {
             builder.setStyle(
                 Notification.BigTextStyle()
-                    .setBigContentTitle("儿童设备管控 · 实时计时")
+                    .setBigContentTitle("设备管控 · 实时计时")
                     .bigText(bigText)
             )
         }

@@ -34,6 +34,26 @@ data class AppPackageSet(
     val packages: MutableSet<String> = LinkedHashSet()
 )
 
+/**
+ * @brief 单个禁止使用时段
+ *
+ * days 用 ISO 星期编号（周一 = 1 … 周日 = 7）；startMinute / endMinute 为当天 0 点起的分钟数。
+ * endMinute 小于 startMinute 表示跨零点（例如 22:00–07:00）；两者相等视为全天。
+ */
+data class TimeSlot(
+    var id: String = UUID.randomUUID().toString(),
+    var days: MutableSet<Int> = LinkedHashSet(listOf(1, 2, 3, 4, 5, 6, 7)),
+    var startMinute: Int = 21 * 60,
+    var endMinute: Int = 7 * 60,
+    var enabled: Boolean = true
+)
+
+/** @brief 时间段管控：命中任一启用时段即全设备禁止使用 */
+data class TimeWindowRule(
+    var enabled: Boolean = false,
+    val slots: MutableList<TimeSlot> = ArrayList()
+)
+
 /** @brief 针对单个应用的每日累计时长规则 */
 data class AppLimitRule(
     var id: String = UUID.randomUUID().toString(),
@@ -53,6 +73,8 @@ data class RulesConfig(
     var restWhitelist: AppPackageSet = AppPackageSet(),
     /** 免计时名单：这些应用在前台时不累计任何时长（每日总量、连续时长、单应用时长） */
     var noCountWhitelist: AppPackageSet = AppPackageSet(),
+    /** 时间段管控：按星期与起止时间禁止使用设备 */
+    var timeWindow: TimeWindowRule = TimeWindowRule(),
     var appLimits: MutableList<AppLimitRule> = ArrayList(),
     /** 有声提示总开关：关闭后提示音、振动与语音全部静音，仅保留图形 */
     var soundEnabled: Boolean = true,
@@ -114,6 +136,20 @@ data class RulesConfig(
         put("noCountWhitelist", JSONObject().apply {
             put("enabled", noCountWhitelist.enabled)
             put("packages", JSONArray().also { arr -> noCountWhitelist.packages.forEach { arr.put(it) } })
+        })
+        put("timeWindow", JSONObject().apply {
+            put("enabled", timeWindow.enabled)
+            put("slots", JSONArray().also { arr ->
+                timeWindow.slots.forEach { t ->
+                    arr.put(JSONObject().apply {
+                        put("id", t.id)
+                        put("days", JSONArray().also { d -> t.days.sorted().forEach { d.put(it) } })
+                        put("startMinute", t.startMinute)
+                        put("endMinute", t.endMinute)
+                        put("enabled", t.enabled)
+                    })
+                }
+            })
         })
         put("appLimits", JSONArray().also { arr ->
             appLimits.forEach { r ->
@@ -216,6 +252,31 @@ data class RulesConfig(
                     for (i in 0 until arr.length()) {
                         val p = arr.optString(i, "")
                         if (p.isNotEmpty()) cfg.noCountWhitelist.packages.add(p)
+                    }
+                }
+            }
+            o.optJSONObject("timeWindow")?.let { tw ->
+                cfg.timeWindow.enabled = tw.optBoolean("enabled", cfg.timeWindow.enabled)
+                tw.optJSONArray("slots")?.let { arr ->
+                    for (i in 0 until arr.length()) {
+                        val e = arr.optJSONObject(i) ?: continue
+                        val days = LinkedHashSet<Int>()
+                        e.optJSONArray("days")?.let { d ->
+                            for (j in 0 until d.length()) {
+                                val day = d.optInt(j, 0)
+                                if (day in 1..7) days.add(day)
+                            }
+                        }
+                        cfg.timeWindow.slots.add(
+                            TimeSlot(
+                                id = e.optString("id", UUID.randomUUID().toString()),
+                                days = days,
+                                // 越界数值一律夹紧到合法范围，避免脏数据把判定算崩
+                                startMinute = e.optInt("startMinute", 21 * 60).coerceIn(0, 1439),
+                                endMinute = e.optInt("endMinute", 7 * 60).coerceIn(0, 1439),
+                                enabled = e.optBoolean("enabled", true)
+                            )
+                        )
                     }
                 }
             }

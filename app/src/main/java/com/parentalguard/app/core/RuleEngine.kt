@@ -5,7 +5,7 @@ import com.parentalguard.app.model.RulesConfig
 import com.parentalguard.app.model.UsageSnapshot
 import java.util.Calendar
 
-enum class LockKind { NONE, DAILY_TOTAL, REST, WHITELIST, APP_LIMIT }
+enum class LockKind { NONE, DAILY_TOTAL, REST, TIME_WINDOW, WHITELIST, APP_LIMIT }
 
 /** @brief 限制作用域；值越大越严格 */
 enum class LockScope { NONE, CURRENT_APP, FULL_DEVICE }
@@ -89,7 +89,22 @@ object RuleEngine {
             )
         }
 
-        // 2. 每日设备总时长（全设备，次日零点解除）
+        // 2. 时间段管控（全设备，命中时段内一律禁止使用，到点自动解除）
+        val inWindow = TimeWindow.activeSlot(cfg.timeWindow, now)
+        if (inWindow != null) {
+            val slot = inWindow.slot
+            list.add(
+                LockDecision(
+                    LockKind.TIME_WINDOW, LockScope.FULL_DEVICE, inWindow.untilMs,
+                    "当前为禁止使用时段",
+                    "${TimeWindow.dayLabel(slot.days)} ${TimeWindow.formatMinute(slot.startMinute)}–" +
+                            "${TimeWindow.formatMinute(slot.endMinute)} 不允许使用设备",
+                    "到达时段结束时间后自动解除"
+                )
+            )
+        }
+
+        // 3. 每日设备总时长（全设备，次日零点解除）
         if (cfg.dailyTotal.enabled) {
             val limitMs = cfg.dailyTotal.limitMinutes.toLong() * MINUTE_MS
             if (snap.totalMs >= limitMs) {

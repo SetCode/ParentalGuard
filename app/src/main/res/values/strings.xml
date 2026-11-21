@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">儿童设备管控</string>
+    <string name="app_name">设备管控</string>
     <string name="title_whitelist">应用白名单</string>
     <string name="title_app_limit">单应用时长限制</string>
-    <string name="accessibility_label">儿童设备管控 · 应用监测</string>
+    <string name="accessibility_label">设备管控 · 应用监测</string>
     <string name="accessibility_desc">用于识别当前前台应用，在达到每日时长、进入强制休息或打开非白名单应用时执行限制。数据仅在本机处理，不会上传。</string>
 </resources>

@@ -145,6 +145,42 @@ class RulesConfigTest {
     }
 
     @Test
+    fun timeWindowRoundTrip_keepsSlotsAndDays() {
+        val cfg = RulesConfig()
+        cfg.timeWindow.enabled = true
+        cfg.timeWindow.slots.add(
+            TimeSlot(
+                id = "s1",
+                days = LinkedHashSet(listOf(1, 3, 5)),
+                startMinute = 21 * 60 + 30,
+                endMinute = 6 * 60 + 45,
+                enabled = true
+            )
+        )
+        val restored = RulesConfig.fromJson(JSONObject(cfg.toJson().toString()))
+        assertTrue(restored.timeWindow.enabled)
+        assertEquals(1, restored.timeWindow.slots.size)
+        val slot = restored.timeWindow.slots[0]
+        assertEquals(setOf(1, 3, 5), slot.days)
+        assertEquals(21 * 60 + 30, slot.startMinute)
+        assertEquals(6 * 60 + 45, slot.endMinute)
+    }
+
+    @Test
+    fun timeWindow_dirtyJsonIsClamped() {
+        // 越界分钟、非法星期、缺字段都要被安全处理
+        val dirty = JSONObject(
+            """{"timeWindow":{"enabled":true,"slots":[
+                {"days":[0,8,2],"startMinute":9999,"endMinute":-5}]}}"""
+        )
+        val cfg = RulesConfig.fromJson(dirty)
+        val slot = cfg.timeWindow.slots[0]
+        assertEquals("只保留合法星期", setOf(2), slot.days)
+        assertEquals(1439, slot.startMinute)
+        assertEquals(0, slot.endMinute)
+    }
+
+    @Test
     fun restAllowsAndCountsUsage() {
         val cfg = RulesConfig()
         cfg.ensureSelf(self)
