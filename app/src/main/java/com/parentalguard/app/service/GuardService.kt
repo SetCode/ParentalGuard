@@ -22,6 +22,7 @@ import com.parentalguard.app.core.LockKind
 import com.parentalguard.app.core.LockScope
 import com.parentalguard.app.core.Permissions
 import com.parentalguard.app.core.RuleEngine
+import com.parentalguard.app.core.TimeWindow
 import com.parentalguard.app.core.StateBus
 import com.parentalguard.app.core.UiStatus
 import com.parentalguard.app.core.UsageAccess
@@ -238,7 +239,19 @@ class GuardService : Service() {
 
         playWarnings(cfg, snap)
 
-        if (eval.locked) {
+        val windowActive = TimeWindow.activeSlot(cfg.timeWindow, now) != null
+        if (windowActive) {
+            // 禁玩时段：不显示任何遮罩，名单外的前台应用直接送回桌面；
+            // 名单内（休息放行）与系统界面保持不动。1 秒一次心跳覆盖「进入时段」与「切换应用」两类时机。
+            overlay.hide()
+            lastLocked = false
+            val systemSurface = fg.isEmpty() || UsageAccess.isSystemSurface(this, fg)
+            if (TimeWindow.shouldKick(cfg, fg, packageName, now, systemSurface) && fg != lastBlockedPkg) {
+                lastBlockedPkg = fg
+                if (!GuardAccessibilityService.goHome()) goHomeFallback()
+                KidPrompt.fire(this, cfg, KidPrompt.Event.TIME_WINDOW, "kick:window:$fg")
+            }
+        } else if (eval.locked) {
             val primary = eval.primary!!
             val appOnly = primary.scope == LockScope.CURRENT_APP
             // 应用级限制用「立即返回桌面 + 短图形卡片 + 语音」提示，不再弹全屏遮罩：

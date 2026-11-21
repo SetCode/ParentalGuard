@@ -75,7 +75,7 @@ object KidPrompt {
         )
         Event.TIME_WINDOW -> Cue(
             "现在不能用", R.drawable.kid_clock, PURPLE,
-            "现在是禁止使用的时间段，到点就自动恢复啦", R.raw.voice_resting,
+            "现在是禁止使用的时间段，已经帮你回到桌面啦", R.raw.voice_block_whitelist,
             SoundAlert.Kind.LOCKED, false
         )
         Event.DAILY_TOTAL -> Cue(

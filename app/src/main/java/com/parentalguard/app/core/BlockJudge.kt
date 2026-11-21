@@ -22,8 +22,10 @@ object BlockJudge {
         if (UsageAccess.isIgnoredPackage(pkg)) return null
         if (UsageAccess.alwaysAllowed(ctx).contains(pkg)) return null
 
-        // 时间段管控属于全设备限制，由全屏遮罩统一处理，这里不重复拦截
-        if (TimeWindow.activeSlot(cfg.timeWindow, now) != null) return null
+        // 时间段管控：不弹遮罩，名单外应用一打开就送回桌面（名单内照常判定其他规则）
+        if (TimeWindow.shouldKick(cfg, pkg, ctx.packageName, now, systemSurface = false)) {
+            return Hit(LockKind.TIME_WINDOW, UsageAccess.appLabel(ctx, pkg))
+        }
 
         val snap = UsageRepository.snapshot(ctx, now)
         // 全设备限制已生效时交给全屏遮罩，避免发出「应用不允许」这类误导性提示

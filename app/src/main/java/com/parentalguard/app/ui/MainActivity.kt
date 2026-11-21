@@ -836,9 +836,17 @@ class MainActivity : Activity() {
             if (s.overlayError.isNotEmpty()) append("\n").append(s.overlayError)
         }
 
+        // 禁玩时段单独上台：它不弹遮罩，只把名单外应用送回桌面，家长需要一眼看到当前处于该状态
+        val window = TimeWindow.activeSlot(cfg.timeWindow, System.currentTimeMillis())
         when {
             !cfg.masterEnabled -> {
                 tvLockState.text = "状态：管控总开关已关闭"
+                tvLockState.setTextColor(getColor(R.color.warning))
+            }
+            window != null -> {
+                tvLockState.text = "状态：禁玩时段（${TimeWindow.dayLabel(window.slot.days)} " +
+                        "${TimeWindow.formatMinute(window.slot.startMinute)}–" +
+                        "${TimeWindow.formatMinute(window.slot.endMinute)}）"
                 tvLockState.setTextColor(getColor(R.color.warning))
             }
             s.locked -> {
@@ -850,10 +858,14 @@ class MainActivity : Activity() {
                 tvLockState.setTextColor(getColor(R.color.success))
             }
         }
-        tvLockReason.text = if (s.lockReasons.isEmpty()) {
-            "当前无限制"
-        } else {
-            s.lockReasons.joinToString("\n") { "• $it" }
+        tvLockReason.text = when {
+            window != null -> {
+                val mins = ((window.untilMs - System.currentTimeMillis()).coerceAtLeast(0L) / 60_000L)
+                "禁玩时段约 ${mins / 60} 小时 ${mins % 60} 分钟后解除；\n" +
+                        "不在「休息放行」名单的应用会被立即送回桌面，本应用不受影响"
+            }
+            s.lockReasons.isEmpty() -> "当前无限制"
+            else -> s.lockReasons.joinToString("\n") { "• $it" }
         }
 
         // 规则关闭时用次要灰显示「未启用」并隐藏空进度条，避免抢走对真实数值的注意力

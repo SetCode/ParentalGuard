@@ -3,6 +3,7 @@ package com.parentalguard.app.core
 import com.parentalguard.app.model.TimeSlot
 import com.parentalguard.app.model.TimeWindowRule
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -130,6 +131,52 @@ class TimeWindowTest {
     private fun slotLabelSpan(start: Int, end: Int): String {
         val label = TimeWindow.slotLabel(slot(setOf(1, 2, 3, 4, 5, 6, 7), start, end))
         return label.substringAfter(' ')
+    }
+
+    // ---------------- 禁玩时段「送回桌面」策略 ----------------
+
+    private fun cfgWithWindow(vararg slots: TimeSlot) =
+        com.parentalguard.app.model.RulesConfig().apply {
+            timeWindow.enabled = true
+            timeWindow.slots.addAll(slots)
+            restWhitelist.enabled = true
+            restWhitelist.packages.add("com.android.dialer")
+        }
+
+    @Test
+    fun shouldKick_onlyWhenInsideWindow() {
+        val cfg = cfgWithWindow(slot(setOf(1, 2, 3, 4, 5, 6, 7), 22 * 60, 7 * 60))
+        // 中午：不在时段内，任何应用都不踢
+        assertFalse(TimeWindow.shouldKick(cfg, "com.tencent.mm", "self.app", ts(0, 12, 0), false))
+        // 深夜：在时段内
+        assertTrue(TimeWindow.shouldKick(cfg, "com.tencent.mm", "self.app", ts(0, 23, 0), false))
+    }
+
+    @Test
+    fun shouldKick_exemptsRestWhitelistSelfAndSystemSurfaces() {
+        val cfg = cfgWithWindow(slot(setOf(1, 2, 3, 4, 5, 6, 7), 22 * 60, 7 * 60))
+        val late = ts(0, 23, 0)
+        assertFalse("休息放行名单内不踢", TimeWindow.shouldKick(cfg, "com.android.dialer", "self.app", late, false))
+        assertFalse("本应用不踢", TimeWindow.shouldKick(cfg, "self.app", "self.app", late, false))
+        assertFalse("系统界面不踢", TimeWindow.shouldKick(cfg, "com.android.systemui", "self.app", late, true))
+        assertFalse("空白前台不踢", TimeWindow.shouldKick(cfg, "", "self.app", late, false))
+    }
+
+    @Test
+    fun shouldKick_respectsRestWhitelistSwitch() {
+        val cfg = cfgWithWindow(slot(setOf(1, 2, 3, 4, 5, 6, 7), 22 * 60, 7 * 60))
+        cfg.restWhitelist.enabled = false
+        assertTrue(
+            "名单开关关闭时谁都不放行",
+            TimeWindow.shouldKick(cfg, "com.android.dialer", "self.app", ts(0, 23, 0), false)
+        )
+    }
+
+    @Test
+    fun shouldKick_falseWhenRuleDisabled() {
+        val cfg = cfgWithWindow(slot(setOf(1, 2, 3, 4, 5, 6, 7), 22 * 60, 7 * 60))
+        cfg.timeWindow.enabled = false
+        assertFalse(TimeWindow.shouldKick(cfg, "com.tencent.mm", "self.app", ts(0, 23, 0), false))
     }
 
     @Test

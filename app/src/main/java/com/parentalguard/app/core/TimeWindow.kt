@@ -121,6 +121,25 @@ object TimeWindow {
         return null
     }
 
+    /**
+     * @brief 禁玩时段内是否应把该应用送回桌面
+     *
+     * 空白前台、本应用自身、系统界面（桌面/状态栏/权限弹窗）一律不动；
+     * 其余应用看「休息放行名单」——名单内照常使用，名单外立即送回桌面。
+     * 名单开关关闭时视为「谁都不放行」，只保留本应用与系统界面。
+     */
+    fun shouldKick(
+        cfg: com.parentalguard.app.model.RulesConfig,
+        pkg: String,
+        selfPackage: String,
+        now: Long,
+        systemSurface: Boolean
+    ): Boolean {
+        if (pkg.isEmpty() || pkg == selfPackage || systemSurface) return false
+        if (activeSlot(cfg.timeWindow, now) == null) return false
+        return !cfg.restAllows(pkg)
+    }
+
     /** @brief 距离下一个边界还有多少毫秒（用于卡片提示），无启用时段时返回 0 */
     fun nextBoundaryIn(rule: TimeWindowRule, now: Long): Long {
         if (!rule.enabled) return 0L

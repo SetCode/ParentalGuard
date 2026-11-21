@@ -89,22 +89,10 @@ object RuleEngine {
             )
         }
 
-        // 2. 时间段管控（全设备，命中时段内一律禁止使用，到点自动解除）
-        val inWindow = TimeWindow.activeSlot(cfg.timeWindow, now)
-        if (inWindow != null) {
-            val slot = inWindow.slot
-            list.add(
-                LockDecision(
-                    LockKind.TIME_WINDOW, LockScope.FULL_DEVICE, inWindow.untilMs,
-                    "当前为禁止使用时段",
-                    "${TimeWindow.dayLabel(slot.days)} ${TimeWindow.formatMinute(slot.startMinute)}–" +
-                            "${TimeWindow.formatMinute(slot.endMinute)} 不允许使用设备",
-                    "到达时段结束时间后自动解除"
-                )
-            )
-        }
+        // 时间段管控不再进入锁决策：它不弹全屏遮罩，而是由 BlockJudge / 心跳把
+        // 「不在休息放行名单」的前台应用直接送回桌面（见 TimeWindow.shouldKick）。
 
-        // 3. 每日设备总时长（全设备，次日零点解除）
+        // 2. 每日设备总时长（全设备，次日零点解除）
         if (cfg.dailyTotal.enabled) {
             val limitMs = cfg.dailyTotal.limitMinutes.toLong() * MINUTE_MS
             if (snap.totalMs >= limitMs) {
