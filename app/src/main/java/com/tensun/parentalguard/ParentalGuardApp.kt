@@ -1,6 +1,9 @@
 package com.tensun.parentalguard
 
+import android.app.Activity
 import android.app.Application
+import android.os.Bundle
+import com.tensun.parentalguard.core.StateBus
 import com.tensun.parentalguard.data.ConfigRepository
 import com.tensun.parentalguard.data.UsageRepository
 import com.tensun.parentalguard.service.GuardService
@@ -11,6 +14,24 @@ import com.tensun.parentalguard.share.ShareSync
 class ParentalGuardApp : Application() {
     override fun onCreate() {
         super.onCreate()
+        // 跟踪自身界面可见性：规则判定据此避免误拦家长正在操作的设置页
+        registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
+            override fun onActivityResumed(activity: Activity) {
+                StateBus.selfActivityVisible = true
+                // 立即触发一次心跳，让遮罩与锁定提示按新状态刷新
+                GuardService.requestTick()
+            }
+
+            override fun onActivityPaused(activity: Activity) {
+                StateBus.selfActivityVisible = false
+            }
+
+            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
+            override fun onActivityStarted(activity: Activity) {}
+            override fun onActivityStopped(activity: Activity) {}
+            override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
+            override fun onActivityDestroyed(activity: Activity) {}
+        })
         ConfigRepository.get(this)
         UsageRepository.ensureToday(this, System.currentTimeMillis())
         // 语音为 apk 内置音频，无需预热引擎

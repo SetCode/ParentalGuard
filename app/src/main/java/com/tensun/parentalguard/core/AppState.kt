@@ -41,6 +41,16 @@ object StateBus {
 
     @Volatile
     var overlayError: String = ""
+
+    /**
+     * @brief 本应用自己的界面是否处于前台
+     *
+     * 由 ActivityLifecycleCallbacks 维护。规则判定优先采信这个信号：
+     * 无障碍未上报或使用统计滞后时，不能因为拿到一个过期的前台包名
+     * 就把正在配置的家长踢回桌面（历史 bug：开启白名单后打开设置页被误杀）。
+     */
+    @Volatile
+    var selfActivityVisible: Boolean = false
 }
 
 /**

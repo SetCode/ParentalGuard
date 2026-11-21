@@ -30,6 +30,7 @@ data class WhitelistRule(
  * [RulesConfig.ensureSelf] 强制加入，家长无法移除。
  */
 data class AppPackageSet(
+    var enabled: Boolean = true,
     val packages: MutableSet<String> = LinkedHashSet()
 )
 
@@ -77,11 +78,13 @@ data class RulesConfig(
         noCountWhitelist.packages.add(selfPackage)
     }
 
-    /** @brief 强制休息期间是否允许该应用继续使用（只豁免休息这一条规则） */
-    fun restAllows(pkg: String): Boolean = restWhitelist.packages.contains(pkg)
+    /** @brief 强制休息期间是否允许该应用继续使用（名单开关关闭时一律不放行） */
+    fun restAllows(pkg: String): Boolean =
+        restWhitelist.enabled && restWhitelist.packages.contains(pkg)
 
-    /** @brief 该应用在前台时是否计入使用时长 */
-    fun countsUsage(pkg: String): Boolean = !noCountWhitelist.packages.contains(pkg)
+    /** @brief 该应用在前台时是否计入使用时长（免计时开关关闭时一律计时） */
+    fun countsUsage(pkg: String): Boolean =
+        !(noCountWhitelist.enabled && noCountWhitelist.packages.contains(pkg))
 
     fun toJson(): JSONObject = JSONObject().apply {
         put("schema", SCHEMA)
@@ -105,9 +108,11 @@ data class RulesConfig(
             put("packages", JSONArray().also { arr -> whitelist.packages.forEach { arr.put(it) } })
         })
         put("restWhitelist", JSONObject().apply {
+            put("enabled", restWhitelist.enabled)
             put("packages", JSONArray().also { arr -> restWhitelist.packages.forEach { arr.put(it) } })
         })
         put("noCountWhitelist", JSONObject().apply {
+            put("enabled", noCountWhitelist.enabled)
             put("packages", JSONArray().also { arr -> noCountWhitelist.packages.forEach { arr.put(it) } })
         })
         put("appLimits", JSONArray().also { arr ->
@@ -132,8 +137,10 @@ data class RulesConfig(
         target.whitelist.enabled = whitelist.enabled
         target.whitelist.packages.clear()
         target.whitelist.packages.addAll(whitelist.packages)
+        target.restWhitelist.enabled = restWhitelist.enabled
         target.restWhitelist.packages.clear()
         target.restWhitelist.packages.addAll(restWhitelist.packages)
+        target.noCountWhitelist.enabled = noCountWhitelist.enabled
         target.noCountWhitelist.packages.clear()
         target.noCountWhitelist.packages.addAll(noCountWhitelist.packages)
     }
@@ -194,16 +201,22 @@ data class RulesConfig(
                 }
             }
             // 旧配置没有这两个名单时保持为空，由 ensureSelf 补上管控自身
-            o.optJSONObject("restWhitelist")?.optJSONArray("packages")?.let { arr ->
-                for (i in 0 until arr.length()) {
-                    val p = arr.optString(i, "")
-                    if (p.isNotEmpty()) cfg.restWhitelist.packages.add(p)
+            o.optJSONObject("restWhitelist")?.let {
+                cfg.restWhitelist.enabled = it.optBoolean("enabled", cfg.restWhitelist.enabled)
+                it.optJSONArray("packages")?.let { arr ->
+                    for (i in 0 until arr.length()) {
+                        val p = arr.optString(i, "")
+                        if (p.isNotEmpty()) cfg.restWhitelist.packages.add(p)
+                    }
                 }
             }
-            o.optJSONObject("noCountWhitelist")?.optJSONArray("packages")?.let { arr ->
-                for (i in 0 until arr.length()) {
-                    val p = arr.optString(i, "")
-                    if (p.isNotEmpty()) cfg.noCountWhitelist.packages.add(p)
+            o.optJSONObject("noCountWhitelist")?.let {
+                cfg.noCountWhitelist.enabled = it.optBoolean("enabled", cfg.noCountWhitelist.enabled)
+                it.optJSONArray("packages")?.let { arr ->
+                    for (i in 0 until arr.length()) {
+                        val p = arr.optString(i, "")
+                        if (p.isNotEmpty()) cfg.noCountWhitelist.packages.add(p)
+                    }
                 }
             }
             o.optJSONArray("appLimits")?.let { arr ->

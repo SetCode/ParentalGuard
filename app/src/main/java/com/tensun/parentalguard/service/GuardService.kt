@@ -250,7 +250,7 @@ class GuardService : Service() {
                 KidPrompt.fire(this, cfg, ev, key)
             }
 
-            if (appOnly && fg.isNotEmpty() && fg != lastBlockedPkg) {
+            if (appOnly && fg.isNotEmpty() && fg != packageName && fg != lastBlockedPkg) {
                 lastBlockedPkg = fg
                 if (!GuardAccessibilityService.goHome()) goHomeFallback()
                 // 与无障碍即时拦截共用去重键，保证一次拦截只提示一次
@@ -358,6 +358,10 @@ class GuardService : Service() {
      * 只有「无任何新事件且上次是普通应用」才保持原状态继续计时，避免静止使用丢时长。
      */
     private fun currentForeground(now: Long): String {
+        // 家长正在操作本应用时优先采信这个信号：
+        // 无障碍未上报 / 使用统计滞后时，取到的可能是上一个应用的包名，
+        // 一旦按白名单拦截就会把家长从设置页踢出去（历史 bug）
+        if (StateBus.selfActivityVisible) return packageName
         if (ForegroundTracker.atHome) return ForegroundTracker.currentPackage
         val tracked = ForegroundTracker.currentPackage
         val fresh = tracked.isNotEmpty() && StateBus.accessibilityConnected &&

@@ -37,10 +37,16 @@ class WhitelistActivity : Activity() {
         const val PREFS_UI = "pg_ui"
         const val KEY_MODE = "whitelistMode"
 
+        val ENABLED_LABELS = arrayOf(
+            "启用可玩白名单限制",
+            "启用休息放行名单",
+            "启用免计时名单"
+        )
+
         val DESCRIPTIONS = arrayOf(
             "勾选允许打开的应用；未勾选的应用启动后会被立即拦截并返回桌面。系统桌面与管控应用始终自动允许。此设置仅本机生效，不同步到局域网其他设备。",
-            "强制休息开始时，这里勾选的应用仍可继续使用，未勾选的应用会被全屏拦截。只豁免「强制休息」这一条规则：每日总时长、单应用限额、可玩白名单照常生效。",
-            "这里勾选的应用在前台时不累计任何时长（今日总量、单次连续、单应用时长都不增长），适合通话、网课等不该占用额度的应用。它只影响计时，不改变任何拦截判定。"
+            "开关打开后，强制休息开始时这里勾选的应用仍可继续使用，未勾选的应用会被全屏拦截。只豁免「强制休息」这一条规则：每日总时长、单应用限额、可玩白名单照常生效。开关关闭时休息期间一律拦截。",
+            "开关打开后，这里勾选的应用在前台时不累计任何时长（今日总量、单次连续、单应用时长都不增长），适合通话、网课等不该占用额度的应用。它只影响计时，不改变任何拦截判定。开关关闭时全部照常计时。"
         )
     }
 
@@ -48,7 +54,10 @@ class WhitelistActivity : Activity() {
     private lateinit var tabs: List<TextView>
     private lateinit var tvModeDesc: TextView
     private lateinit var rowEnabled: View
+    private lateinit var tvEnabledLabel: TextView
     private lateinit var swEnabled: Switch
+    /** 程序化设置开关状态时置位，避免回调把刚切的模式又写回去 */
+    private var bindingSwitch = false
     private lateinit var editSearch: EditText
     private lateinit var listView: ListView
     private lateinit var tvEmpty: TextView
@@ -76,14 +85,24 @@ class WhitelistActivity : Activity() {
         )
         tvModeDesc = findViewById(R.id.tvModeDesc)
         rowEnabled = findViewById(R.id.rowEnabled)
+        tvEnabledLabel = findViewById(R.id.tvEnabledLabel)
         swEnabled = findViewById(R.id.swWhitelistEnabled)
         editSearch = findViewById(R.id.editSearch)
         listView = findViewById(R.id.listApps)
         tvEmpty = findViewById(R.id.tvEmpty)
 
-        swEnabled.isChecked = cfg.whitelist.enabled
+        // 三份名单各自独立开关：回调按当前模式写入对应字段
         swEnabled.setOnCheckedChangeListener { _, checked ->
-            ConfigRepository.update(this) { it.whitelist.enabled = checked }
+            if (bindingSwitch) return@setOnCheckedChangeListener
+            val target = mode
+            ConfigRepository.update(this) { c ->
+                when (target) {
+                    MODE_REST -> c.restWhitelist.enabled = checked
+                    MODE_NO_COUNT -> c.noCountWhitelist.enabled = checked
+                    else -> c.whitelist.enabled = checked
+                }
+            }
+            cfg = ConfigRepository.get(this)
         }
 
         adapter = AppsAdapter()
@@ -111,8 +130,11 @@ class WhitelistActivity : Activity() {
         mode = index
         for (i in tabs.indices) tabs[i].isSelected = i == index
         tvModeDesc.text = DESCRIPTIONS[index]
-        // 只有「可玩白名单」是一整条限制规则，可开关；另两个名单按集合内容生效
-        rowEnabled.visibility = if (index == MODE_PLAYABLE) View.VISIBLE else View.GONE
+        // 三份名单都有独立开关，标签与开关状态随模式切换
+        tvEnabledLabel.text = ENABLED_LABELS[index]
+        bindingSwitch = true
+        swEnabled.isChecked = enabledOf(index)
+        bindingSwitch = false
         selected.clear()
         selected.addAll(packagesOf(index))
         selected.add(selfPackage)
@@ -120,6 +142,12 @@ class WhitelistActivity : Activity() {
             getSharedPreferences(PREFS_UI, MODE_PRIVATE).edit().putInt(KEY_MODE, index).apply()
         }
         applyFilter()
+    }
+
+    private fun enabledOf(index: Int): Boolean = when (index) {
+        MODE_REST -> cfg.restWhitelist.enabled
+        MODE_NO_COUNT -> cfg.noCountWhitelist.enabled
+        else -> cfg.whitelist.enabled
     }
 
     private fun packagesOf(index: Int): Set<String> = when (index) {

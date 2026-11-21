@@ -103,6 +103,48 @@ class RulesConfigTest {
     }
 
     @Test
+    fun switchesTurnListsOffWithoutLosingPackages() {
+        val cfg = RulesConfig()
+        cfg.ensureSelf(self)
+        cfg.restWhitelist.packages.add("com.android.dialer")
+        cfg.noCountWhitelist.packages.add("com.tencent.edu")
+
+        // 关闭开关：名单内容保留，但判定一律不放行 / 一律计时
+        cfg.restWhitelist.enabled = false
+        cfg.noCountWhitelist.enabled = false
+        assertFalse(cfg.restAllows("com.android.dialer"))
+        assertFalse(cfg.restAllows(self))
+        assertTrue(cfg.countsUsage("com.tencent.edu"))
+        assertTrue(cfg.countsUsage(self))
+        assertTrue(cfg.restWhitelist.packages.contains("com.android.dialer"))
+        assertTrue(cfg.noCountWhitelist.packages.contains("com.tencent.edu"))
+
+        // 重新打开立即恢复
+        cfg.restWhitelist.enabled = true
+        cfg.noCountWhitelist.enabled = true
+        assertTrue(cfg.restAllows("com.android.dialer"))
+        assertFalse(cfg.countsUsage("com.tencent.edu"))
+    }
+
+    @Test
+    fun jsonRoundTrip_keepsSwitchStates() {
+        val cfg = RulesConfig()
+        cfg.restWhitelist.enabled = false
+        cfg.noCountWhitelist.enabled = true
+        val restored = RulesConfig.fromJson(JSONObject(cfg.toJson().toString()))
+        assertFalse(restored.restWhitelist.enabled)
+        assertTrue(restored.noCountWhitelist.enabled)
+    }
+
+    @Test
+    fun legacyJson_defaultsSwitchesToOn() {
+        val legacy = JSONObject("""{"schema":1,"restWhitelist":{"packages":["com.a"]}}""")
+        val cfg = RulesConfig.fromJson(legacy)
+        assertTrue("老配置默认开启", cfg.restWhitelist.enabled)
+        assertTrue(cfg.noCountWhitelist.enabled)
+    }
+
+    @Test
     fun restAllowsAndCountsUsage() {
         val cfg = RulesConfig()
         cfg.ensureSelf(self)

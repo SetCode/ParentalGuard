@@ -427,7 +427,9 @@ class MainActivity : Activity() {
                 } else {
                     "可玩白名单未启用：所有应用均可打开（已勾选 $playable 个）"
                 }
-                "$head\n休息期间放行 $rest 个 · 免计时 $noCount 个（均含本应用）"
+                val restState = if (c.restWhitelist.enabled) "已开" else "已关"
+                val countState = if (c.noCountWhitelist.enabled) "已开" else "已关"
+                "$head\n休息放行 $restState（$rest 个） · 免计时 $countState（$noCount 个） · 均含本应用"
             },
             onToggle = { v -> ConfigRepository.update(this) { c -> c.whitelist.enabled = v } },
             onAction = {
