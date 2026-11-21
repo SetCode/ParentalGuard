@@ -25,7 +25,7 @@ ParentalGuard/
 │   ├── build.gradle
 │   └── src/main/
 │       ├── AndroidManifest.xml
-│       ├── java/com/tensun/parentalguard/
+│       ├── java/com/parentalguard/app/
 │       │   ├── ParentalGuardApp.kt        应用入口（预加载配置并恢复服务）
 │       │   ├── model/                     规则模型、每日用量模型、JSON 编解码
 │       │   ├── data/                     配置仓库、用量仓库（SharedPreferences）
@@ -63,7 +63,7 @@ ParentalGuard/
 | targetSdk | 33（可在 Android 14/15/16 设备安装运行） |
 | compileSdk | 34 |
 | 构建工具 | JDK 17 + Gradle 8.2 + AGP 8.1.4 + Kotlin 1.9.22 |
-| 包名 | `com.tensun.parentalguard` |
+| 包名 | `com.parentalguard.app` |
 
 ---
 

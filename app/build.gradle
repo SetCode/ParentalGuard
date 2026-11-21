@@ -13,11 +13,11 @@ def appVersionName = (project.findProperty('versionName') ?: versionProps.getPro
 def appVersionCode = (project.findProperty('versionCode') ?: versionProps.getProperty('versionCode') ?: '1').toString().toInteger()
 
 android {
-    namespace 'com.tensun.parentalguard'
+    namespace 'com.parentalguard.app'
     compileSdk 34
 
     defaultConfig {
-        applicationId 'com.tensun.parentalguard'
+        applicationId 'com.parentalguard.app'
         minSdk 26
         // 保持 33：规避 Android 14 对前台服务类型的额外声明要求，
         // 同时仍然可以安装并运行在 Android 14/15/16 设备上。

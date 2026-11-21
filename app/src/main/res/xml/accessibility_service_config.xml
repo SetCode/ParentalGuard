@@ -6,4 +6,4 @@
     android:accessibilityFlags="flagIncludeNotImportantViews|flagRetrieveInteractiveWindows"
     android:canRetrieveWindowContent="true"
     android:notificationTimeout="150"
-    android:settingsActivity="com.tensun.parentalguard.ui.MainActivity" />
+    android:settingsActivity="com.parentalguard.app.ui.MainActivity" />
