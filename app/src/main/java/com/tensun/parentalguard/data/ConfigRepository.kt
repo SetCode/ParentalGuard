@@ -49,6 +49,8 @@ object ConfigRepository {
                     RulesConfig()
                 }
             }
+            // 三类名单必须包含管控自身，否则家长可能在开启白名单或删空名单后把自己锁在外面
+            loaded.ensureSelf(ctx.packageName)
             cached = loaded
             return loaded
         }
@@ -56,6 +58,7 @@ object ConfigRepository {
 
     /** @brief 写入当前分区并通知监听者；不触发共享回写 */
     private fun saveInternal(ctx: Context, cfg: RulesConfig) {
+        cfg.ensureSelf(ctx.packageName)
         cached = cfg
         sp(ctx).edit().putString(KEY, cfg.toJson().toString()).apply()
         listeners.forEach {
@@ -138,6 +141,7 @@ object ConfigRepository {
                     RulesConfig()
                 }
                 carry.copyLocalOnlyTo(cfg)
+                cfg.ensureSelf(ctx.packageName)
                 prefs.edit().putString(KEY, cfg.toJson().toString()).apply()
             }
             cached = null

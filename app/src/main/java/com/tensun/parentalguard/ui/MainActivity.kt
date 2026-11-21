@@ -415,16 +415,19 @@ class MainActivity : Activity() {
         )
 
         addRuleCard(
-            title = "应用白名单",
-            actionLabel = "管理允许的应用",
+            title = "应用名单（可玩 / 休息放行 / 免计时）",
+            actionLabel = "管理三类名单",
             enabledOf = { it.whitelist.enabled },
-            summaryOf = {
-                val count = it.whitelist.packages.size
-                if (it.whitelist.enabled) {
-                    "已允许 $count 个应用；白名单外的应用一打开就自动返回桌面，并用图形 + 语音提醒（系统桌面与管控应用始终允许）"
+            summaryOf = { c ->
+                val playable = c.whitelist.packages.size
+                val rest = c.restWhitelist.packages.size
+                val noCount = c.noCountWhitelist.packages.size
+                val head = if (c.whitelist.enabled) {
+                    "可玩白名单已启用：$playable 个应用（含本应用），名单外应用一打开就返回桌面"
                 } else {
-                    "未启用：所有应用均可打开（已配置 $count 个应用）"
+                    "可玩白名单未启用：所有应用均可打开（已勾选 $playable 个）"
                 }
+                "$head\n休息期间放行 $rest 个 · 免计时 $noCount 个（均含本应用）"
             },
             onToggle = { v -> ConfigRepository.update(this) { c -> c.whitelist.enabled = v } },
             onAction = {

@@ -77,8 +77,8 @@ object RuleEngine {
         val midnight = nextMidnight(now)
         val alwaysAllowed = UsageAccess.alwaysAllowed(ctx)
 
-        // 1. 强制休息（全设备）
-        if (snap.restUntilMs > now) {
+        // 1. 强制休息（全设备）；休息放行名单内的应用单独豁免这一条锁
+        if (snap.restUntilMs > now && !cfg.restAllows(foreground)) {
             list.add(
                 LockDecision(
                     LockKind.REST, LockScope.FULL_DEVICE, snap.restUntilMs,
@@ -120,7 +120,9 @@ object RuleEngine {
                     )
                 )
             }
+            // 免计时应用不会累计时长，单应用限额对它没有意义，直接跳过
             for (r in cfg.appLimits) {
+                if (!cfg.countsUsage(foreground)) break
                 if (!r.enabled || r.packageName != foreground) continue
                 val limitMs = r.dailyMinutes.toLong() * MINUTE_MS
                 if ((snap.perAppMs[foreground] ?: 0L) >= limitMs) {

@@ -34,6 +34,7 @@ object BlockJudge {
             return Hit(LockKind.WHITELIST, label)
         }
         for (r in cfg.appLimits) {
+            if (!cfg.countsUsage(pkg)) break
             if (!r.enabled || r.packageName != pkg) continue
             val limitMs = r.dailyMinutes.toLong() * RuleEngine.MINUTE_MS
             if ((snap.perAppMs[pkg] ?: 0L) >= limitMs) {

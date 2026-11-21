@@ -123,7 +123,9 @@ object UsageRepository {
                 val stats = UsageAccess.todayForeground(ctx, now)
                 var sum = 0L
                 for ((pkg, ms) in stats) {
-                    if (pkg == ctx.packageName || pkg == "android" || pkg.startsWith("com.android.systemui")) continue
+                    if (pkg == "android" || pkg.startsWith("com.android.systemui")) continue
+                    // 免计时名单与管控自身都不参与对账，避免重启后被系统统计「补回来」
+                    if (!countable(ctx, pkg)) continue
                     if (ms > (s.perAppUsedMs[pkg] ?: 0L)) s.perAppUsedMs[pkg] = ms
                     sum += ms
                 }
@@ -160,9 +162,14 @@ object UsageRepository {
         s.segmentPackage = pkg
     }
 
-    /** @brief 计时范围：仅可计时应用处于前台才累计，桌面/系统界面/后台/未知前台一律暂停 */
+    /**
+     * @brief 计时范围：仅可计时应用处于前台才累计
+     *
+     * 除桌面 / 系统界面 / 后台 / 未知前台外，免计时名单里的应用同样不累计；
+     * 该名单由 ConfigRepository 读取（其中强制包含管控自身）。
+     */
     private fun countable(ctx: Context, pkg: String): Boolean =
-        UsageAccess.isCountableForeground(ctx, pkg)
+        UsageAccess.isCountableForeground(ctx, pkg) && ConfigRepository.get(ctx).countsUsage(pkg)
 
     /** @brief 立即暂停：结算当前片段并清零起点，供窗口切换事件调用（不等下一次心跳） */
     fun pause(ctx: Context, now: Long) = synchronized(lockObj) {
