@@ -31,14 +31,30 @@ object AppCatalog {
         installed: Collection<InstalledPkg>,
         selfPackage: String
     ): List<String> {
+        val meta = installed.associateBy { it.pkg }
         val out = LinkedHashSet<String>()
+        // 1. 用户应用（有桌面入口的）
         for (p in launcherPkgs) {
-            if (p.isNotEmpty() && p != selfPackage) out.add(p)
+            if (p.isEmpty() || p == selfPackage) continue
+            if (meta[p]?.isSystem == true) continue
+            out.add(p)
+        }
+        // 2. 用户应用（无桌面入口，如插件、分身）
+        for (p in installed) {
+            if (p.pkg.isEmpty() || p.pkg == selfPackage) continue
+            if (!p.enabled || p.isSystem) continue
+            out.add(p.pkg)
+        }
+        // 3. 系统应用：有桌面入口的在前，其余在后
+        for (p in launcherPkgs) {
+            if (p.isEmpty() || p == selfPackage) continue
+            if (meta[p]?.isSystem != true) continue
+            if (meta[p]?.enabled == false) continue
+            out.add(p)
         }
         for (p in installed) {
             if (p.pkg.isEmpty() || p.pkg == selfPackage) continue
-            if (!p.enabled) continue          // 已停用的应用打不开，不必列
-            if (p.isSystem) continue          // 系统应用只保留有桌面入口的那批
+            if (!p.enabled || !p.isSystem) continue
             out.add(p.pkg)
         }
         return out.toList()

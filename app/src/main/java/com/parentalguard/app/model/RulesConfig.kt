@@ -75,6 +75,12 @@ data class RulesConfig(
     var noCountWhitelist: AppPackageSet = AppPackageSet(),
     /** 时间段管控：按星期与起止时间禁止使用设备 */
     var timeWindow: TimeWindowRule = TimeWindowRule(),
+    /**
+     * 是否已执行过「系统应用默认加入休息放行 + 免计时」的初始化
+     *
+     * 只执行一次：否则家长把某个系统应用移出名单后，下次启动又被加回来。
+     */
+    var systemDefaultsApplied: Boolean = false,
     var appLimits: MutableList<AppLimitRule> = ArrayList(),
     /** 有声提示总开关：关闭后提示音、振动与语音全部静音，仅保留图形 */
     var soundEnabled: Boolean = true,
@@ -100,6 +106,24 @@ data class RulesConfig(
         noCountWhitelist.packages.add(selfPackage)
     }
 
+    /**
+     * @brief 首次初始化：把系统应用批量加入「休息放行」与「免计时」
+     *
+     * @return 是否真的做了改动（已初始化过则返回 false，不会覆盖家长的调整）
+     */
+    fun applySystemDefaults(systemPkgs: Collection<String>): Boolean {
+        if (systemDefaultsApplied) return false
+        // 查询失败（空集合）时不打标记，下次启动再试，避免永久漏掉默认规则
+        if (systemPkgs.isEmpty()) return false
+        for (p in systemPkgs) {
+            if (p.isEmpty()) continue
+            restWhitelist.packages.add(p)
+            noCountWhitelist.packages.add(p)
+        }
+        systemDefaultsApplied = true
+        return true
+    }
+
     /** @brief 强制休息期间是否允许该应用继续使用（名单开关关闭时一律不放行） */
     fun restAllows(pkg: String): Boolean =
         restWhitelist.enabled && restWhitelist.packages.contains(pkg)
@@ -116,6 +140,7 @@ data class RulesConfig(
         put("blockSoundEnabled", blockSoundEnabled)
         put("visualPromptEnabled", visualPromptEnabled)
         put("parentPin", parentPin)
+        put("systemDefaultsApplied", systemDefaultsApplied)
         put("dailyTotal", JSONObject().apply {
             put("enabled", dailyTotal.enabled)
             put("limitMinutes", dailyTotal.limitMinutes)
@@ -217,6 +242,7 @@ data class RulesConfig(
             cfg.blockSoundEnabled = o.optBoolean("blockSoundEnabled", cfg.blockSoundEnabled)
             cfg.visualPromptEnabled = o.optBoolean("visualPromptEnabled", cfg.visualPromptEnabled)
             cfg.parentPin = o.optString("parentPin", cfg.parentPin)
+            cfg.systemDefaultsApplied = o.optBoolean("systemDefaultsApplied", false)
 
             o.optJSONObject("dailyTotal")?.let {
                 cfg.dailyTotal.enabled = it.optBoolean("enabled", cfg.dailyTotal.enabled)

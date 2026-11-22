@@ -181,6 +181,48 @@ class RulesConfigTest {
     }
 
     @Test
+    fun applySystemDefaults_addsToBothListsOnce() {
+        val cfg = RulesConfig()
+        val sys = setOf("com.android.settings", "com.android.bluetooth")
+
+        assertTrue(cfg.applySystemDefaults(sys))
+        assertTrue(cfg.systemDefaultsApplied)
+        assertTrue(cfg.restWhitelist.packages.containsAll(sys))
+        assertTrue(cfg.noCountWhitelist.packages.containsAll(sys))
+
+        // 家长移出其中一个后，再次初始化不能把它加回来
+        cfg.restWhitelist.packages.remove("com.android.bluetooth")
+        assertFalse("已初始化过不再执行", cfg.applySystemDefaults(sys))
+        assertFalse(cfg.restWhitelist.packages.contains("com.android.bluetooth"))
+        // 免计时名单里的不受影响
+        assertTrue(cfg.noCountWhitelist.packages.contains("com.android.bluetooth"))
+    }
+
+    @Test
+    fun applySystemDefaults_emptyInputDoesNotLockInTheFlag() {
+        val cfg = RulesConfig()
+        assertFalse("空集合视为查询失败", cfg.applySystemDefaults(emptyList()))
+        assertFalse(cfg.systemDefaultsApplied)
+        // 下次拿到数据仍能正常初始化
+        assertTrue(cfg.applySystemDefaults(setOf("com.android.settings")))
+    }
+
+    @Test
+    fun systemDefaultsFlag_survivesJsonRoundTrip() {
+        val cfg = RulesConfig()
+        cfg.applySystemDefaults(setOf("com.android.settings"))
+        val restored = RulesConfig.fromJson(JSONObject(cfg.toJson().toString()))
+        assertTrue("重启后不能重复初始化", restored.systemDefaultsApplied)
+        assertTrue(restored.restWhitelist.packages.contains("com.android.settings"))
+    }
+
+    @Test
+    fun legacyConfig_defaultsToNotApplied() {
+        val legacy = JSONObject("""{"schema":1,"masterEnabled":true}""")
+        assertFalse(RulesConfig.fromJson(legacy).systemDefaultsApplied)
+    }
+
+    @Test
     fun restAllowsAndCountsUsage() {
         val cfg = RulesConfig()
         cfg.ensureSelf(self)

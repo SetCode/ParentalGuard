@@ -12,7 +12,13 @@ import android.view.inputmethod.InputMethodManager
 import java.util.Calendar
 
 /** @brief 可启动应用条目 */
-data class AppEntry(val pkg: String, val label: String, val icon: Drawable?)
+data class AppEntry(
+    val pkg: String,
+    val label: String,
+    val icon: Drawable?,
+    /** 是否系统应用：名单里排在用户应用之后，便于区分 */
+    val isSystem: Boolean = false
+)
 
 /**
  * @brief 由系统使用情况事件推导出的前台状态
@@ -72,6 +78,33 @@ object UsageAccess {
         return set
     }
 
+    /**
+     * @brief 需要纳入默认名单的系统应用
+     *
+     * 排除：本应用自身、android/systemui、桌面（这些本来就不参与计时与拦截）、
+     * 以及输入法（键盘窗口独立于应用归属，放进来只会让名单变噪）。
+     */
+    fun systemPackages(ctx: Context): Set<String> {
+        val out = HashSet<String>()
+        val launchers = defaultLaunchers(ctx) + HOME_PKGS
+        val imes = imePackages(ctx)
+        try {
+            for (pi in ctx.packageManager.getInstalledPackages(0)) {
+                val ai = pi.applicationInfo ?: continue
+                if ((ai.flags and ApplicationInfo.FLAG_SYSTEM) == 0) continue
+                val pkg = pi.packageName
+                if (pkg.isEmpty() || pkg == ctx.packageName) continue
+                if (pkg == "android" || pkg.startsWith("com.android.systemui")) continue
+                if (launchers.contains(pkg)) continue
+                if (imes.contains(pkg)) continue
+                out.add(pkg)
+            }
+        } catch (e: Exception) {
+            // 列举失败时返回空集合，不阻塞配置加载
+        }
+        return out
+    }
+
     /** @brief 是否为输入法包（键盘窗口不应改变前台应用归属） */
     fun isImePackage(ctx: Context, pkg: String): Boolean =
         pkg.isNotEmpty() && imePackages(ctx).contains(pkg)
@@ -111,6 +144,7 @@ object UsageAccess {
             // 个别 ROM 拒绝列举时保留桌面来源
         }
 
+        val systemSet = installed.filter { it.isSystem }.map { it.pkg }.toHashSet()
         val list = ArrayList<AppEntry>()
         for (pkg in AppCatalog.select(launcherPkgs, installed, ctx.packageName)) {
             val label = try {
@@ -123,9 +157,10 @@ object UsageAccess {
             } catch (e: Exception) {
                 null
             }
-            list.add(AppEntry(pkg, label, icon))
+            list.add(AppEntry(pkg, label, icon, systemSet.contains(pkg)))
         }
-        list.sortWith(compareBy({ it.label.lowercase() }, { it.pkg }))
+        // 用户应用在前、系统应用在后，各自按名称排序
+        list.sortWith(compareBy({ it.isSystem }, { it.label.lowercase() }, { it.pkg }))
         return list
     }
 

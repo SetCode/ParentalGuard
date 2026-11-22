@@ -40,8 +40,8 @@ class AppCatalogTest {
     }
 
     @Test
-    fun systemAppsWithoutLauncherAreExcluded() {
-        // com.android.* 之类系统包若没有桌面入口则不列，避免淹没列表
+    fun systemAppsAreIncludedSoTheyCanBeManaged() {
+        // 系统应用也要能在名单里单独增删（默认会被加进休息放行与免计时）
         val result = AppCatalog.select(
             launcherPkgs = listOf("com.android.settings"),
             installed = listOf(
@@ -51,7 +51,27 @@ class AppCatalogTest {
             ),
             selfPackage = self
         )
-        assertEquals(listOf("com.android.settings"), result)
+        assertTrue(result.contains("com.android.settings"))
+        assertTrue("无桌面入口的系统应用也要列出", result.contains("com.android.providers.media"))
+        assertTrue(result.contains("com.android.bluetooth"))
+    }
+
+    @Test
+    fun userAppsComeBeforeSystemApps() {
+        val result = AppCatalog.select(
+            launcherPkgs = listOf("com.android.settings", "com.tencent.mm"),
+            installed = listOf(
+                pkg("com.android.settings", system = true),
+                pkg("com.tencent.mm"),
+                pkg("com.example.plugin")
+            ),
+            selfPackage = self
+        )
+        // 用户应用（有入口 → 无入口）在前，系统应用在后
+        assertEquals(
+            listOf("com.tencent.mm", "com.example.plugin", "com.android.settings"),
+            result
+        )
     }
 
     @Test

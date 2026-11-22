@@ -3,6 +3,7 @@ package com.parentalguard.app.data
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import com.parentalguard.app.core.UsageAccess
 import com.parentalguard.app.model.RulesConfig
 import com.parentalguard.app.share.ShareSync
 import org.json.JSONObject
@@ -51,6 +52,13 @@ object ConfigRepository {
             }
             // 三类名单必须包含管控自身，否则家长可能在开启白名单或删空名单后把自己锁在外面
             loaded.ensureSelf(ctx.packageName)
+            // 首次初始化：系统应用默认同时进入「休息放行」与「免计时」。
+            // 只执行一次，之后家长的增删不会再被覆盖。
+            if (!loaded.systemDefaultsApplied &&
+                loaded.applySystemDefaults(UsageAccess.systemPackages(ctx))
+            ) {
+                sp(ctx).edit().putString(KEY, loaded.toJson().toString()).apply()
+            }
             cached = loaded
             return loaded
         }
