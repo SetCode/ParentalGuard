@@ -743,6 +743,40 @@
                         android:textSize="11sp" />
                 </LinearLayout>
 
+                <!-- 重置设置 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"
+                    android:background="@drawable/bg_card"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="重置设置"
+                        android:textColor="@color/text_main"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="把全部规则恢复到默认值：清空每日时长、连续使用、三类名单、时间段与单应用限额，并关闭相关开关。家长密码与今日计时数据保留（计时清理请用主界面的「时间重置」）。"
+                        android:textColor="@color/text_sub"
+                        android:textSize="11sp" />
+
+                    <Button
+                        android:id="@+id/btnResetSettings"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:background="@drawable/bg_btn_secondary"
+                        android:textColor="@color/danger"
+                        android:text="重置全部规则设置" />
+                </LinearLayout>
+
                 <!-- 版本与更新 -->
                 <LinearLayout
                     android:layout_width="match_parent"

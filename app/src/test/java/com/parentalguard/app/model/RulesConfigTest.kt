@@ -223,6 +223,55 @@ class RulesConfigTest {
     }
 
     @Test
+    fun resetToDefaults_clearsRulesButKeepsPin() {
+        val cfg = RulesConfig()
+        cfg.parentPin = "8899"
+        cfg.masterEnabled = true
+        cfg.dailyTotal.enabled = true
+        cfg.dailyTotal.limitMinutes = 300
+        cfg.session.enabled = true
+        cfg.session.continuousMinutes = 45
+        cfg.whitelist.enabled = true
+        cfg.whitelist.packages.addAll(listOf("com.tencent.mm", "com.android.chrome"))
+        cfg.restWhitelist.packages.add("com.android.dialer")
+        cfg.noCountWhitelist.packages.add("com.tencent.edu")
+        cfg.timeWindow.enabled = true
+        cfg.timeWindow.slots.add(TimeSlot(days = LinkedHashSet(listOf(1, 2)), startMinute = 60, endMinute = 120))
+        cfg.appLimits.add(AppLimitRule(packageName = "com.tencent.mm", dailyMinutes = 20, enabled = true))
+        cfg.soundEnabled = false
+        cfg.voiceEnabled = false
+        cfg.systemDefaultsApplied = true
+
+        cfg.resetToDefaults()
+
+        // 规则回到默认并清空
+        assertFalse(cfg.dailyTotal.enabled)
+        assertFalse(cfg.session.enabled)
+        assertFalse(cfg.whitelist.enabled)
+        assertTrue("白名单内容清空", cfg.whitelist.packages.isEmpty())
+        assertTrue(cfg.restWhitelist.packages.isEmpty())
+        assertTrue(cfg.noCountWhitelist.packages.isEmpty())
+        assertFalse(cfg.timeWindow.enabled)
+        assertTrue(cfg.timeWindow.slots.isEmpty())
+        assertTrue(cfg.appLimits.isEmpty())
+        assertTrue("提示开关恢复默认", cfg.soundEnabled && cfg.voiceEnabled)
+        assertFalse("重置后重新套用系统应用默认", cfg.systemDefaultsApplied)
+
+        // 密码必须保留，否则孩子可以靠重置绕过管控
+        assertEquals("8899", cfg.parentPin)
+    }
+
+    @Test
+    fun resetToDefaultsThenEnsureSelfAndDefaults() {
+        val cfg = RulesConfig()
+        cfg.resetToDefaults()
+        cfg.ensureSelf(self)
+        cfg.applySystemDefaults(setOf("com.android.settings"))
+        assertTrue("自保护仍然生效", cfg.restWhitelist.packages.contains(self))
+        assertTrue(cfg.noCountWhitelist.packages.contains("com.android.settings"))
+    }
+
+    @Test
     fun restAllowsAndCountsUsage() {
         val cfg = RulesConfig()
         cfg.ensureSelf(self)

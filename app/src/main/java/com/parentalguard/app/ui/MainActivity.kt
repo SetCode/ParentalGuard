@@ -93,6 +93,7 @@ class MainActivity : Activity() {
     private lateinit var tvUpdateStatus: TextView
     private lateinit var btnCheckUpdate: Button
     private lateinit var tvAutoStartStatus: TextView
+    private lateinit var btnResetSettings: Button
     private lateinit var btnAutoStart: Button
     private lateinit var btnOpenReleases: Button
     private lateinit var tabs: List<TextView>
@@ -201,6 +202,7 @@ class MainActivity : Activity() {
         tvUpdateStatus = findViewById(R.id.tvUpdateStatus)
         btnCheckUpdate = findViewById(R.id.btnCheckUpdate)
         tvAutoStartStatus = findViewById(R.id.tvAutoStartStatus)
+        btnResetSettings = findViewById(R.id.btnResetSettings)
         btnAutoStart = findViewById(R.id.btnAutoStart)
         btnOpenReleases = findViewById(R.id.btnOpenReleases)
         // 分页标签与页面容器：索引一一对应，切换时只改可见性
@@ -288,6 +290,7 @@ class MainActivity : Activity() {
         btnTtsSettings.setOnClickListener { openSoundSettings() }
         // 检查失败（如被 GitHub 限流）时家长仍有手动入口
         btnOpenReleases.setOnClickListener { openUrl(ReleaseRepo.RELEASES_PAGE) }
+        btnResetSettings.setOnClickListener { confirmResetSettings() }
         btnAutoStart.setOnClickListener {
             if (!AutoStart.openSettings(this)) {
                 Toast.makeText(this, "本机没有直达入口，请到「设置 → 应用 → 自启动管理」手动允许", Toast.LENGTH_LONG).show()
@@ -681,6 +684,50 @@ class MainActivity : Activity() {
     // ---------------------------------------------------------------- 版本与更新
 
     /** @brief 展示本机版本号与上次检查时间，未检查过时给出明确文案 */
+    /**
+     * @brief 重置设置：两段确认，避免误触清掉整套规则
+     *
+     * 第一段说明会清掉什么、保留什么；第二段才是不可撤销的最终确认。
+     */
+    private fun confirmResetSettings() {
+        val cfg = ConfigRepository.get(this)
+        val affected = buildString {
+            append("将清除：\n")
+            append("• 每日总时长、连续使用与强制休息设置\n")
+            append("• 三类应用名单（可玩 / 休息放行 / 免计时）\n")
+            append("• 时间段管控（${cfg.timeWindow.slots.size} 个时段）\n")
+            append("• 单应用每日限额（${cfg.appLimits.size} 条）\n")
+            append("• 声音与图形提示开关\n\n")
+            append("保留：家长密码、今日计时数据、开机自启动与局域网共享设置。")
+        }
+        AlertDialog.Builder(this)
+            .setTitle("重置全部规则设置？")
+            .setMessage(affected)
+            .setNegativeButton("取消", null)
+            .setPositiveButton("继续") { _, _ -> doResetSettings() }
+            .show()
+    }
+
+    private fun doResetSettings() {
+        AlertDialog.Builder(this)
+            .setTitle("再次确认")
+            .setMessage("此操作不可撤销，重置后所有规则需重新设置。确定继续？")
+            .setNegativeButton("取消", null)
+            .setPositiveButton("确认重置") { _, _ ->
+                ConfigRepository.update(this) { c ->
+                    c.resetToDefaults()
+                    // 立刻重新套用「系统应用默认进两名单」，不必等下次冷启动
+                    c.applySystemDefaults(UsageAccess.systemPackages(this))
+                    c.ensureSelf(packageName)
+                }
+                cfg = ConfigRepository.get(this)
+                renderConfig()
+                renderStatus()
+                Toast.makeText(this, "已重置全部规则设置", Toast.LENGTH_SHORT).show()
+            }
+            .show()
+    }
+
     /** @brief 展示上次开机自启动时间，让家长能确认自启动确实生效 */
     private fun renderAutoStart() {
         val last = AutoStart.lastBootAt(this)

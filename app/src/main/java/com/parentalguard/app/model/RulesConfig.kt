@@ -107,6 +107,36 @@ data class RulesConfig(
     }
 
     /**
+     * @brief 恢复默认设置
+     *
+     * 清空全部规则内容并回到出厂默认值：时长、连续使用、三类名单、时间段、单应用限额、提示开关。
+     * **保留**家长密码（否则孩子可以靠「重置」绕过管控）与计时数据（计时由独立的「时间重置」负责）。
+     * 同时把 systemDefaultsApplied 归零，使系统应用默认名单在下一次加载时重新套用。
+     */
+    fun resetToDefaults() {
+        val def = RulesConfig()
+        masterEnabled = def.masterEnabled
+        dailyTotal = def.dailyTotal
+        session = def.session
+        soundEnabled = def.soundEnabled
+        voiceEnabled = def.voiceEnabled
+        blockSoundEnabled = def.blockSoundEnabled
+        visualPromptEnabled = def.visualPromptEnabled
+
+        whitelist.enabled = def.whitelist.enabled
+        whitelist.packages.clear()
+        restWhitelist.enabled = def.restWhitelist.enabled
+        restWhitelist.packages.clear()
+        noCountWhitelist.enabled = def.noCountWhitelist.enabled
+        noCountWhitelist.packages.clear()
+
+        timeWindow.enabled = def.timeWindow.enabled
+        timeWindow.slots.clear()
+        appLimits.clear()
+        systemDefaultsApplied = false
+    }
+
+    /**
      * @brief 首次初始化：把系统应用批量加入「休息放行」与「免计时」
      *
      * @return 是否真的做了改动（已初始化过则返回 false，不会覆盖家长的调整）
