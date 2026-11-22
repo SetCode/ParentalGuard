@@ -180,6 +180,12 @@ class WhitelistActivity : Activity() {
             }
         }
         adapter.notifyDataSetChanged()
+        // 把可选应用总数写在说明里：家长能据此核对「列表是否完整」，排查漏应用时不用猜
+        tvModeDesc.text = if (loaded) {
+            DESCRIPTIONS[mode] + "\n本机共 ${allApps.size} 个应用可选"
+        } else {
+            DESCRIPTIONS[mode]
+        }
         tvEmpty.text = when {
             !loaded -> "正在读取应用列表…"
             allApps.isEmpty() -> "未读取到可启动应用"

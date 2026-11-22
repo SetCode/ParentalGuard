@@ -4,6 +4,7 @@ import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
 import android.os.Build
@@ -46,25 +47,56 @@ object UsageAccess {
 
     fun isIgnoredPackage(pkg: String): Boolean = pkg.isEmpty() || IGNORED.contains(pkg)
 
-    /** @brief 列举设备上所有可从桌面启动的应用（排除本应用自身） */
+    /**
+     * @brief 列举可以管控的应用（排除本应用自身）
+     *
+     * 只查桌面入口会漏掉没有启动图标的已安装应用，名单里就选不到它们。
+     * 这里合并「桌面可见应用」与「其余非系统已安装应用」，规则见 [AppCatalog.select]。
+     */
     fun installedApps(ctx: Context): List<AppEntry> {
         val pm = ctx.packageManager
-        val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-        val resolved = try {
-            pm.queryIntentActivities(intent, 0)
+
+        val launcherPkgs = LinkedHashSet<String>()
+        try {
+            val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+            for (r in pm.queryIntentActivities(intent, 0)) {
+                r.activityInfo?.packageName?.let { launcherPkgs.add(it) }
+            }
         } catch (e: Exception) {
-            emptyList()
+            // 查询失败时退化为仅用已安装列表
         }
+
+        val installed = ArrayList<AppCatalog.InstalledPkg>()
+        try {
+            for (pi in pm.getInstalledPackages(0)) {
+                val ai = pi.applicationInfo ?: continue
+                installed.add(
+                    AppCatalog.InstalledPkg(
+                        pkg = pi.packageName,
+                        isSystem = (ai.flags and ApplicationInfo.FLAG_SYSTEM) != 0,
+                        enabled = ai.enabled
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            // 个别 ROM 拒绝列举时保留桌面来源
+        }
+
         val list = ArrayList<AppEntry>()
-        val seen = HashSet<String>()
-        for (r in resolved) {
-            val pkg = r.activityInfo?.packageName ?: continue
-            if (pkg == ctx.packageName || !seen.add(pkg)) continue
-            val label = try { r.loadLabel(pm).toString() } catch (e: Exception) { pkg }
-            val icon = try { r.loadIcon(pm) } catch (e: Exception) { null }
+        for (pkg in AppCatalog.select(launcherPkgs, installed, ctx.packageName)) {
+            val label = try {
+                pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
+            } catch (e: Exception) {
+                pkg
+            }
+            val icon = try {
+                pm.getApplicationIcon(pkg)
+            } catch (e: Exception) {
+                null
+            }
             list.add(AppEntry(pkg, label, icon))
         }
-        list.sortBy { it.label }
+        list.sortWith(compareBy({ it.label.lowercase() }, { it.pkg }))
         return list
     }
 
