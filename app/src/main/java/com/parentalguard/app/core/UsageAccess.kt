@@ -8,6 +8,7 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
 import android.os.Build
+import android.view.inputmethod.InputMethodManager
 import java.util.Calendar
 
 /** @brief 可启动应用条目 */
@@ -46,6 +47,34 @@ object UsageAccess {
     private const val EVENT_WINDOW_MS = 60_000L
 
     fun isIgnoredPackage(pkg: String): Boolean = pkg.isEmpty() || IGNORED.contains(pkg)
+
+    @Volatile
+    private var cachedIme: Set<String>? = null
+
+    /**
+     * @brief 本机输入法的包名集合
+     *
+     * 输入法键盘是浮在当前应用之上的窗口，无障碍会为它单独上报一次窗口切换。
+     * 若把它当成「切到了输入法应用」，就会出现「在设置页打字被判成打开了别的应用」
+     * 从而触发拦截的误伤。这里供各个判定入口统一排除。
+     */
+    fun imePackages(ctx: Context): Set<String> {
+        cachedIme?.let { return it }
+        val set = HashSet<String>()
+        try {
+            val imm = ctx.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+            imm?.inputMethodList?.forEach { set.add(it.packageName) }
+            imm?.enabledInputMethodList?.forEach { set.add(it.packageName) }
+        } catch (e: Exception) {
+            // 个别 ROM 查询输入法列表会抛异常，退化为空集合（不影响其他判定）
+        }
+        cachedIme = set
+        return set
+    }
+
+    /** @brief 是否为输入法包（键盘窗口不应改变前台应用归属） */
+    fun isImePackage(ctx: Context, pkg: String): Boolean =
+        pkg.isNotEmpty() && imePackages(ctx).contains(pkg)
 
     /**
      * @brief 列举可以管控的应用（排除本应用自身）

@@ -246,7 +246,10 @@ class GuardService : Service() {
             overlay.hide()
             lastLocked = false
             val systemSurface = fg.isEmpty() || UsageAccess.isSystemSurface(this, fg)
-            if (TimeWindow.shouldKick(cfg, fg, packageName, now, systemSurface) && fg != lastBlockedPkg) {
+            val imeUp = UsageAccess.isImePackage(this, fg)
+            if (!imeUp && TimeWindow.shouldKick(cfg, fg, packageName, now, systemSurface) &&
+                fg != lastBlockedPkg
+            ) {
                 lastBlockedPkg = fg
                 if (!GuardAccessibilityService.goHome()) goHomeFallback()
                 KidPrompt.fire(this, cfg, KidPrompt.Event.TIME_WINDOW, "kick:window:$fg")
@@ -263,7 +266,9 @@ class GuardService : Service() {
                 KidPrompt.fire(this, cfg, ev, key)
             }
 
-            if (appOnly && fg.isNotEmpty() && fg != packageName && fg != lastBlockedPkg) {
+            if (appOnly && fg.isNotEmpty() && fg != packageName &&
+                !UsageAccess.isImePackage(this, fg) && fg != lastBlockedPkg
+            ) {
                 lastBlockedPkg = fg
                 if (!GuardAccessibilityService.goHome()) goHomeFallback()
                 // 与无障碍即时拦截共用去重键，保证一次拦截只提示一次

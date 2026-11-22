@@ -61,6 +61,9 @@ class GuardAccessibilityService : AccessibilityService() {
         if (pkg.isEmpty()) return
         // 通知栏 / 状态栏等系统浮层短暂覆盖在应用之上，不改变应用归属
         if (pkg == "android" || pkg.startsWith("com.android.systemui")) return
+        // 输入法键盘同理：它浮在当前应用之上，不能算「切换到了输入法应用」，
+        // 否则在设置页打字会被误判并触发拦截
+        if (UsageAccess.isImePackage(this, pkg)) return
 
         val now = System.currentTimeMillis()
         val prev = ForegroundTracker.currentPackage

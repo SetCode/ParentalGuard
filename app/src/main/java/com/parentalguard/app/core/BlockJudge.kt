@@ -18,7 +18,10 @@ object BlockJudge {
     /** @brief 返回需要拦截的原因；null 表示允许打开 */
     fun check(ctx: Context, cfg: RulesConfig, pkg: String, now: Long): Hit? {
         if (!cfg.masterEnabled) return null
+        // 家长正在本应用里操作（含打字时的键盘弹出）时不做任何应用级拦截
+        if (StateBus.selfActivityVisible) return null
         if (pkg.isEmpty() || pkg == ctx.packageName) return null
+        if (UsageAccess.isImePackage(ctx, pkg)) return null
         if (UsageAccess.isIgnoredPackage(pkg)) return null
         if (UsageAccess.alwaysAllowed(ctx).contains(pkg)) return null
 
