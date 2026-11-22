@@ -69,7 +69,14 @@ echo "Gradle：$GRADLE_BIN"
 push_with_retry() {
     local ref="$1" i out
     for i in 1 2 3 4 5; do
-        if out=$(git push origin "$ref" 2>&1); then
+        # 前两次走系统代理；后三次绕开代理直连，
+        # 应对「代理隧道 502 / 握手失败但直连可用」这类环境问题
+        if [ "$i" -le 2 ]; then
+            out=$(git push origin "$ref" 2>&1)
+        else
+            out=$(git -c http.proxy= -c https.proxy= push origin "$ref" 2>&1)
+        fi
+        if [ $? -eq 0 ]; then
             printf '%s\n' "$out" | tail -1
             return 0
         fi
