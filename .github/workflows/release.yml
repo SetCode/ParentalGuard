@@ -101,7 +101,7 @@ jobs:
           fi
           PREV=$(git tag --sort=-v:refname | grep -vx "v$V" | head -n1 || true)
           {
-            echo "## 儿童设备管控 v$V"
+            echo "## 设备管控 v$V"
             echo
             if [ -n "$PREV" ]; then
               echo "**变更内容（自 $PREV）**"
@@ -114,7 +114,10 @@ jobs:
             fi
             echo
             echo
-            echo "下载 \`ParentalGuard-v$V.apk\` 覆盖安装即可，本机已有规则与计时数据不受影响。"
+            echo "安装：下载 \`ParentalGuard-v$V.apk\`。"
+            echo
+            echo "> **注意**：自 v1.3.0 起包名已改为 \`com.parentalguard.app\`（原 \`com.tensun.parentalguard\`），"
+            echo "> 与更早版本不是同一个应用，**无法覆盖升级**，请先卸载旧版再安装（旧版的规则与计时数据不会保留）。"
             echo
             echo "校验：\`sha256sum ParentalGuard-v$V.apk\` 应与附件 \`.sha256\` 一致。"
           } > release-notes.md
